@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function ChatInterface() {
   const [messages, setMessages] = useState([
@@ -7,8 +7,29 @@ export default function ChatInterface() {
     { id: 2, text: 'Welcome to the chat!', sender: 'bot' }
   ]);
   const [inputText, setInputText] = useState('');
+  const [anonUid, setAnonUid] = useState('');
 
-  const handleSendMessage = () => {
+  useEffect(() => {
+    let isMounted = true;
+    async function bootstrapSession() {
+      try {
+        const res = await fetch('/api/chat', { method: 'GET', credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (isMounted && data?.uid) {
+          setAnonUid(data.uid);
+        }
+      } catch {
+        // ignore bootstrap errors on client
+      }
+    }
+    bootstrapSession();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSendMessage = async () => {
     if (inputText.trim() === '') return;
 
     // Add user message
@@ -18,14 +39,44 @@ export default function ChatInterface() {
       sender: 'user'
     };
 
-    // Add bot response after a short delay
+    setMessages([...messages, newUserMessage]);
+
+    const num = Number(inputText);
+    let botText = '';
+    if (Number.isNaN(num)) {
+      botText = 'Please enter a valid number.';
+    } else {
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ number: num })
+        });
+        if (!res.ok) {
+          botText = `Server error: ${res.status}`;
+        } else {
+          const data = await res.json().catch(() => ({}));
+          if (typeof data?.result === 'number') {
+            botText = `Server result: ${data.result}${data.anonCreated ? ' (new session)' : ''}`;
+            if (data.uid && !anonUid) {
+              setAnonUid(data.uid);
+            }
+          } else {
+            botText = 'Unexpected server response.';
+          }
+        }
+      } catch {
+        botText = 'Network error contacting server.';
+      }
+    }
+
     const newBotMessage = {
       id: messages.length + 2,
-      text: `You said: "${inputText}"`,
+      text: botText,
       sender: 'bot'
     };
-
-    setMessages([...messages, newUserMessage, newBotMessage]);
+    setMessages(prev => [...prev, newBotMessage]);
     setInputText('');
   };
 
@@ -38,6 +89,11 @@ export default function ChatInterface() {
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Simple Chat 💬</h1>
+      <div style={styles.sessionBar}>
+        <span style={styles.sessionText}>
+          {anonUid ? `Session: ${anonUid}` : 'Starting session...'}
+        </span>
+      </div>
       
       <div style={styles.chatContainer}>
         <div style={styles.messagesContainer}>
@@ -148,5 +204,14 @@ const styles = {
     borderRadius: '25px',
     cursor: 'pointer',
     fontSize: '16px'
+  },
+  sessionBar: {
+    marginTop: '-12px',
+    marginBottom: '8px',
+    textAlign: 'center'
+  },
+  sessionText: {
+    fontSize: '12px',
+    color: '#444'
   }
 };
