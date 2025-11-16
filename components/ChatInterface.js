@@ -1,83 +1,81 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { db } from '../lib/firebase-client';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function ChatInterface() {
-  const [messages, setMessages] = useState([
-    { id: 1, text: 'Hello! 👋', sender: 'bot' },
-    { id: 2, text: 'Welcome to the chat!', sender: 'bot' }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [anonUid, setAnonUid] = useState('');
+  const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef(null);
 
+  // Scroll to bottom when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Set up Firestore listener for real-time updates
   useEffect(() => {
     let isMounted = true;
-    async function bootstrapSession() {
+    let unsubscribe = null;
+
+    async function setupFirestoreListener() {
       try {
-        const res = await fetch('/api/chat', { method: 'GET', credentials: 'include' });
-        if (!res.ok) return;
-        const data = await res.json().catch(() => ({}));
-        if (isMounted && data?.uid) {
-          setAnonUid(data.uid);
-        }
-      } catch {
-        // ignore bootstrap errors on client
+        const messagesRef = collection(db, 'messages');
+        const q = query(messagesRef, orderBy('timestamp', 'asc'));
+        
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          if (!isMounted) return;
+          
+          const messagesList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            text: doc.data().text || '',
+            sender: doc.data().sender || 'user',
+            timestamp: doc.data().timestamp
+          }));
+          
+          setMessages(messagesList);
+          setLoading(false);
+        }, (error) => {
+          console.error('Firestore listener error:', error);
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error('Error setting up Firestore listener:', error);
+        setLoading(false);
       }
     }
-    bootstrapSession();
+
+    setupFirestoreListener();
+
     return () => {
       isMounted = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, []);
 
   const handleSendMessage = async () => {
     if (inputText.trim() === '') return;
 
-    // Add user message
-    const newUserMessage = {
-      id: messages.length + 1,
-      text: inputText,
-      sender: 'user'
-    };
+    const messageText = inputText.trim();
+    setInputText(''); // Clear input immediately for better UX
 
-    setMessages([...messages, newUserMessage]);
-
-    const num = Number(inputText);
-    let botText = '';
-    if (Number.isNaN(num)) {
-      botText = 'Please enter a valid number.';
-    } else {
-      try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ number: num })
-        });
-        if (!res.ok) {
-          botText = `Server error: ${res.status}`;
-        } else {
-          const data = await res.json().catch(() => ({}));
-          if (typeof data?.result === 'number') {
-            botText = `Server result: ${data.result}${data.anonCreated ? ' (new session)' : ''}`;
-            if (data.uid && !anonUid) {
-              setAnonUid(data.uid);
-            }
-          } else {
-            botText = 'Unexpected server response.';
-          }
-        }
-      } catch {
-        botText = 'Network error contacting server.';
-      }
+    // Save message directly to Firestore from client
+    // The Firestore listener will automatically update the UI
+    try {
+      const messagesRef = collection(db, 'messages');
+      
+      await addDoc(messagesRef, {
+        text: messageText,
+        sender: 'user',
+        timestamp: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Optionally show error to user
     }
-
-    const newBotMessage = {
-      id: messages.length + 2,
-      text: botText,
-      sender: 'bot'
-    };
-    setMessages(prev => [...prev, newBotMessage]);
-    setInputText('');
   };
 
   const handleKeyPress = (e) => {
@@ -89,25 +87,27 @@ export default function ChatInterface() {
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Simple Chat 💬</h1>
-      <div style={styles.sessionBar}>
-        <span style={styles.sessionText}>
-          {anonUid ? `Session: ${anonUid}` : 'Starting session...'}
-        </span>
-      </div>
       
       <div style={styles.chatContainer}>
         <div style={styles.messagesContainer}>
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              style={{
-                ...styles.message,
-                ...(message.sender === 'user' ? styles.userMessage : styles.botMessage)
-              }}
-            >
-              {message.text}
-            </div>
-          ))}
+          {loading ? (
+            <div style={styles.loadingText}>Loading messages...</div>
+          ) : messages.length === 0 ? (
+            <div style={styles.loadingText}>No messages yet. Start chatting!</div>
+          ) : (
+            messages.map((message) => (
+              <div
+                key={message.id}
+                style={{
+                  ...styles.message,
+                  ...(message.sender === 'user' ? styles.userMessage : styles.botMessage)
+                }}
+              >
+                {message.text}
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
         </div>
 
         <div style={styles.inputContainer}>
@@ -205,13 +205,10 @@ const styles = {
     cursor: 'pointer',
     fontSize: '16px'
   },
-  sessionBar: {
-    marginTop: '-12px',
-    marginBottom: '8px',
-    textAlign: 'center'
-  },
-  sessionText: {
-    fontSize: '12px',
-    color: '#444'
+  loadingText: {
+    textAlign: 'center',
+    color: '#999',
+    padding: '20px',
+    fontStyle: 'italic'
   }
 };
