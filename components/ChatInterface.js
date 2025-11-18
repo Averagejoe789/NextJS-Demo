@@ -1,13 +1,19 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { db } from '../lib/firebase-client';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
-export default function ChatInterface() {
+export default function ChatInterface({ restaurantId, chatId }) {
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
+
+  // Get restaurantId and chatId from props or URL params
+  const finalRestaurantId = restaurantId || searchParams.get('restaurantId');
+  const finalChatId = chatId || searchParams.get('chatId');
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -16,12 +22,20 @@ export default function ChatInterface() {
 
   // Set up Firestore listener for real-time updates
   useEffect(() => {
+    if (!finalRestaurantId || !finalChatId) {
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
     let unsubscribe = null;
 
     async function setupFirestoreListener() {
       try {
-        const messagesRef = collection(db, 'messages');
+        const messagesRef = collection(
+          db,
+          `restaurants/${finalRestaurantId}/chatSessions/${finalChatId}/messages`
+        );
         const q = query(messagesRef, orderBy('timestamp', 'asc'));
         
         unsubscribe = onSnapshot(q, (snapshot) => {
@@ -54,10 +68,14 @@ export default function ChatInterface() {
         unsubscribe();
       }
     };
-  }, []);
+  }, [finalRestaurantId, finalChatId]);
 
   const handleSendMessage = async () => {
     if (inputText.trim() === '') return;
+    if (!finalRestaurantId || !finalChatId) {
+      console.error('restaurantId and chatId are required');
+      return;
+    }
 
     const messageText = inputText.trim();
     setInputText(''); // Clear input immediately for better UX
@@ -65,10 +83,12 @@ export default function ChatInterface() {
     // Save message directly to Firestore from client
     // The Firestore listener will automatically update the UI
     try {
-      const messagesRef = collection(db, 'messages');
+      const messagesRef = collection(
+        db,
+        `restaurants/${finalRestaurantId}/chatSessions/${finalChatId}/messages`
+      );
       
       await addDoc(messagesRef, {
-        country: "india",
         text: messageText,
         sender: 'user',
         timestamp: serverTimestamp()
@@ -84,6 +104,16 @@ export default function ChatInterface() {
       handleSendMessage();
     }
   };
+
+  if (!finalRestaurantId || !finalChatId) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loadingText}>
+          Please provide restaurantId and chatId as props or URL parameters
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>

@@ -34,28 +34,34 @@ if (!admin.apps.length) {
 }
 
 export async function POST(req) {
-	const contentType = req.headers.get('content-type') || '';
-	if (!contentType.includes('application/json')) {
-		return new Response(
-			JSON.stringify({ error: 'Content-Type must be application/json' }),
-			{
-				status: 400,
-				headers: { 'Content-Type': 'application/json; charset=utf-8' },
-			}
-		);
-	}
+	// Get URL and parse query parameters
+	const url = new URL(req.url);
+	const queryRestaurantId = url.searchParams.get('restaurantId');
+	const queryChatId = url.searchParams.get('chatId');
 
-	let body;
-	try {
-		body = await req.json();
-	} catch {
-		return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-			status: 400,
-			headers: { 'Content-Type': 'application/json; charset=utf-8' },
-		});
+	const contentType = req.headers.get('content-type') || '';
+	let body = {};
+	
+	// Only parse JSON body if Content-Type is application/json
+	if (contentType.includes('application/json')) {
+		try {
+			body = await req.json();
+		} catch {
+			// If JSON parsing fails but we have query params, continue
+			if (!queryRestaurantId || !queryChatId) {
+				return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+					status: 400,
+					headers: { 'Content-Type': 'application/json; charset=utf-8' },
+				});
+			}
+		}
 	}
 
 	const messageText = body?.text || body?.message || '';
+	// Get restaurantId and chatId from query params first, then fallback to body
+	const restaurantId = queryRestaurantId || body?.restaurantId;
+	const chatId = queryChatId || body?.chatId;
+
 	if (!messageText || typeof messageText !== 'string' || messageText.trim() === '') {
 		return new Response(
 			JSON.stringify({ error: 'Message text is required' }),
@@ -66,10 +72,35 @@ export async function POST(req) {
 		);
 	}
 
+	if (!restaurantId || typeof restaurantId !== 'string' || restaurantId.trim() === '') {
+		return new Response(
+			JSON.stringify({ error: 'restaurantId is required' }),
+			{
+				status: 400,
+				headers: { 'Content-Type': 'application/json; charset=utf-8' },
+			}
+		);
+	}
+
+	if (!chatId || typeof chatId !== 'string' || chatId.trim() === '') {
+		return new Response(
+			JSON.stringify({ error: 'chatId is required' }),
+			{
+				status: 400,
+				headers: { 'Content-Type': 'application/json; charset=utf-8' },
+			}
+		);
+	}
+
 	// Save message to Firestore using Admin SDK
 	try {
 		const db = admin.firestore();
-		const messagesRef = db.collection('messages');
+		const messagesRef = db
+			.collection('restaurants')
+			.doc(restaurantId.trim())
+			.collection('chatSessions')
+			.doc(chatId.trim())
+			.collection('messages');
 		
 		// Save user message
 		const userDocRef = await messagesRef.add({
