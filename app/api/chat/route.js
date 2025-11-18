@@ -2,9 +2,35 @@ import admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
-	admin.initializeApp({
-		projectId: 'menuai-d0ab5',
-	});
+	try {
+		// Try to use service account credentials from environment variable
+		const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+		
+		if (serviceAccountJson) {
+			// Parse the JSON string from environment variable
+			const serviceAccount = JSON.parse(serviceAccountJson);
+			admin.initializeApp({
+				credential: admin.credential.cert(serviceAccount),
+				projectId: serviceAccount.project_id || 'menuai-d0ab5',
+			});
+		} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+			// Use the path to service account key file
+			admin.initializeApp({
+				credential: admin.credential.applicationDefault(),
+				projectId: 'menuai-d0ab5',
+			});
+		} else {
+			// Fallback: try to use application default credentials
+			// This will work if gcloud is configured locally
+			admin.initializeApp({
+				credential: admin.credential.applicationDefault(),
+				projectId: 'menuai-d0ab5',
+			});
+		}
+	} catch (error) {
+		console.error('❌ Error initializing Firebase Admin:', error);
+		throw new Error('Failed to initialize Firebase Admin SDK. Please check your credentials configuration.');
+	}
 }
 
 export async function POST(req) {
@@ -48,7 +74,6 @@ export async function POST(req) {
 		// Save user message
 		const userDocRef = await messagesRef.add({
 			text: messageText.trim(),
-			sender: 'user',
 			timestamp: admin.firestore.FieldValue.serverTimestamp()
 		});
 		console.log('✅ User message saved to Firestore:', userDocRef.id);

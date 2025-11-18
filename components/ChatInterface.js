@@ -68,6 +68,7 @@ export default function ChatInterface() {
       const messagesRef = collection(db, 'messages');
       
       await addDoc(messagesRef, {
+        country: "india",
         text: messageText,
         sender: 'user',
         timestamp: serverTimestamp()
