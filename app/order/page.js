@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { db } from '../../lib/firebase-client';
 import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, addDoc, updateDoc, setDoc } from 'firebase/firestore';
@@ -7,7 +7,10 @@ import MenuDisplay from '../../components/customer/MenuDisplay';
 import AIChatInterface from '../../components/customer/AIChatInterface';
 import Cart from '../../components/customer/Cart';
 
-export default function OrderPage() {
+// Force dynamic rendering since we use useSearchParams
+export const dynamic = 'force-dynamic';
+
+function OrderPageContent() {
   const searchParams = useSearchParams();
   const restaurantId = searchParams.get('restaurantId');
   const tableId = searchParams.get('tableId');
@@ -405,6 +408,18 @@ export default function OrderPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OrderPage() {
+  return (
+    <Suspense fallback={
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingText}>Loading order interface...</div>
+      </div>
+    }>
+      <OrderPageContent />
+    </Suspense>
   );
 }
 
