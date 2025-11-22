@@ -1,29 +1,220 @@
+/* Mobile-first responsive styles */
+
+/* Base styles */
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #333;
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  /* Order page - stack layout on mobile */
+  .order-content {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    padding: 0 12px !important;
+    margin: 12px auto !important;
+  }
+
+  .order-left-panel {
+    order: 1;
+  }
+
+  .order-right-panel {
+    order: 2;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    z-index: 1000;
+    border-radius: 16px 16px 0 0 !important;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.15) !important;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .order-header {
+    padding: 12px !important;
+  }
+
+  .restaurant-name {
+    font-size: 20px !important;
+  }
+
+  .restaurant-logo {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  /* Menu grid - single column on mobile */
+  .menu-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .menu-item {
+    margin-bottom: 12px;
+  }
+
+  /* Chat interface - full height on mobile */
+  .chat-container {
+    height: 400px !important;
+    min-height: 400px !important;
+  }
+
+  .chat-messages {
+    max-height: 300px !important;
+  }
+
+  /* Category filter - horizontal scroll on mobile */
+  .category-filter {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .category-filter::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Buttons - touch-friendly on mobile */
+  button {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    font-size: 16px !important;
+    touch-action: manipulation;
+  }
+
+  /* Input fields - larger on mobile */
+  input, textarea {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+    min-height: 44px !important;
+  }
+
+  /* Cart - bottom sheet style on mobile */
+  .cart-container {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-height: 70vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2) !important;
+    padding: 16px !important;
+    z-index: 1000;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Add spacing to bottom of content when cart is visible */
+  .order-left-panel {
+    margin-bottom: 80px;
+  }
+
+  /* View toggle buttons - full width on mobile */
+  .view-toggle {
+    position: sticky !important;
+    top: 80px !important;
+    z-index: 99 !important;
+    padding: 8px 12px !important;
+    margin: 0 !important;
+  }
+
+  .toggle-button {
+    font-size: 15px !important;
+    padding: 10px 16px !important;
+    min-height: 44px !important;
+  }
+
+  /* Hide cart when empty on mobile (show button instead) */
+  .cart-container:has(.emptyCart) {
+    display: none;
+  }
+
+  /* Show floating cart button when cart is empty */
+  .floating-cart-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    font-size: 24px;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .order-content {
+    grid-template-columns: 1fr 300px !important;
+    gap: 16px !important;
+  }
+
+  .menu-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .order-header {
+    padding: 8px 12px !important;
+  }
+
+  .section-title {
+    font-size: 18px !important;
+  }
+
+  .cart-title {
+    font-size: 18px !important;
+  }
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+/* Prevent text selection on buttons (better touch UX) */
+button {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Safe area for iOS notch */
+@supports (padding: max(0px)) {
+  .order-header,
+  .cart-container,
+  .order-right-panel {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .cart-container,
+  .order-right-panel {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
 }

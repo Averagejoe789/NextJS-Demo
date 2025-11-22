@@ -4,3 +4,16 @@ export default function AdminRestaurant() {
   return <RestaurantForm />;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+

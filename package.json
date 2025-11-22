@@ -6,12 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "create-restaurant": "node scripts/create-restaurant.js"
   },
   "dependencies": {
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
     "next": "14.x.x",
+    "openai": "^4.104.0",
+    "qrcode": "^1.5.4",
     "react": "^18",
     "react-dom": "^18"
   },

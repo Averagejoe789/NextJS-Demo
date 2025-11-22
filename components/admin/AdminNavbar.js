@@ -27,6 +27,12 @@ export default function AdminNavbar() {
           <Link href="/admin/menu" style={styles.navLink}>
             Menu
           </Link>
+          <Link href="/admin/tables" style={styles.navLink}>
+            Tables
+          </Link>
+          <Link href="/admin/orders" style={styles.navLink}>
+            Orders
+          </Link>
           <button 
             onClick={handleLogout}
             style={styles.logoutButton}

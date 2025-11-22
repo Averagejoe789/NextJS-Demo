@@ -95,6 +95,18 @@ export default function Dashboard() {
                 <h3 style={styles.actionTitle}>Manage Menu</h3>
                 <p style={styles.actionDescription}>Add or edit menu items</p>
               </Link>
+
+              <Link href="/admin/tables" style={styles.actionCard}>
+                <div style={styles.actionIcon}>🍽️</div>
+                <h3 style={styles.actionTitle}>Manage Tables</h3>
+                <p style={styles.actionDescription}>Configure tables and QR codes</p>
+              </Link>
+
+              <Link href="/admin/orders" style={styles.actionCard}>
+                <div style={styles.actionIcon}>📦</div>
+                <h3 style={styles.actionTitle}>View Orders</h3>
+                <p style={styles.actionDescription}>Manage customer orders</p>
+              </Link>
             </div>
           </div>
 
