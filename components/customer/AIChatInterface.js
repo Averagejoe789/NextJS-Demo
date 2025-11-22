@@ -342,11 +342,6 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
             )}
           </button>
         </div>
-        <div style={styles.inputFooter}>
-          <span style={styles.footerText}>
-            💡 Tip: Ask naturally like "I'd like 2 pizzas" or "What do you recommend?"
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -609,7 +604,7 @@ const styles = {
   inputWrapper: {
     borderTop: '1px solid #e5e7eb',
     backgroundColor: '#ffffff',
-    padding: '0.75rem 0.5rem',
+    padding: '0.75rem 0.5rem 0.5rem 0.5rem',
     position: 'sticky',
     bottom: 0,
     zIndex: 10,
@@ -624,7 +619,7 @@ const styles = {
     borderRadius: '1.25rem',
     padding: '0.625rem 0.875rem',
     transition: 'all 200ms ease-in-out',
-    marginBottom: '0.5rem',
+    marginBottom: 0,
   },
   
   inputContainerFocused: {
@@ -680,16 +675,5 @@ const styles = {
     borderTopColor: '#ffffff',
     borderRadius: '50%',
     animation: 'spin 600ms linear infinite',
-  },
-  
-  inputFooter: {
-    textAlign: 'center',
-    paddingTop: '0.5rem',
-  },
-  
-  footerText: {
-    fontSize: '0.75rem',
-    color: '#9ca3af',
-    fontStyle: 'italic',
   },
 };

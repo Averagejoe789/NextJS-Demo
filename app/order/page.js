@@ -515,7 +515,12 @@ export default function OrderPage() {
 const styles = {
   container: {
     minHeight: '100vh',
-    backgroundColor: '#f9fafb'
+    backgroundColor: '#f9fafb',
+    width: '100vw',
+    maxWidth: '100vw',
+    overflowX: 'hidden',
+    boxSizing: 'border-box',
+    position: 'relative',
   },
   loadingContainer: {
     display: 'flex',
@@ -667,12 +672,20 @@ const styles = {
     padding: '0 20px',
     display: 'grid',
     gridTemplateColumns: '1fr 350px',
-    gap: '20px'
+    gap: '20px',
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
   },
   leftPanel: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '20px'
+    gap: '20px',
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
   },
   rightPanel: {
     height: 'fit-content'
@@ -683,6 +696,11 @@ const styles = {
     padding: '1.5rem',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     border: '1px solid #e5e7eb',
+    width: '100%',
+    maxWidth: '100%',
+    overflowX: 'hidden',
+    overflowY: 'visible',
+    boxSizing: 'border-box',
   },
   chatSection: {
     backgroundColor: '#ffffff',
