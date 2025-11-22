@@ -35,6 +35,7 @@ function OrderPageContent() {
     }
 
     // Add timeout safety - if initialization takes more than 10 seconds, show error
+    // This prevents the page from being stuck on "Loading..." indefinitely
     const timeoutId = setTimeout(() => {
       console.error('⏰ Initialization timeout - taking too long!');
       if (loading) {
