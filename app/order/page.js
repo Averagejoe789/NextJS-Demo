@@ -6,6 +6,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, addDoc, 
 import MenuDisplay from '../../components/customer/MenuDisplay';
 import AIChatInterface from '../../components/customer/AIChatInterface';
 import Cart from '../../components/customer/Cart';
+import OrderLoading from './loading';
 
 // Force dynamic rendering since we use useSearchParams
 export const dynamic = 'force-dynamic';
@@ -413,11 +414,7 @@ function OrderPageContent() {
 
 export default function OrderPage() {
   return (
-    <Suspense fallback={
-      <div style={styles.loadingContainer}>
-        <div style={styles.loadingText}>Loading order interface...</div>
-      </div>
-    }>
+    <Suspense fallback={<OrderLoading />}>
       <OrderPageContent />
     </Suspense>
   );
