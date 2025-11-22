@@ -6,6 +6,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, addDoc, 
 import MenuDisplay from '../../components/customer/MenuDisplay';
 import AIChatInterface from '../../components/customer/AIChatInterface';
 import Cart from '../../components/customer/Cart';
+import FloatingCart from '../../components/customer/FloatingCart';
 import OrderLoading from './loading';
 
 // Force dynamic rendering since we use useSearchParams
@@ -33,22 +34,51 @@ function OrderPageContent() {
       return;
     }
 
-    initializeOrder();
+    // Add timeout safety - if initialization takes more than 10 seconds, show error
+    const timeoutId = setTimeout(() => {
+      console.error('⏰ Initialization timeout - taking too long!');
+      if (loading) {
+        setError('Page is taking too long to load. Please check your internet connection and try again.');
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
+    initializeOrder().finally(() => {
+      clearTimeout(timeoutId);
+    });
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [restaurantId, tableId]);
 
   const initializeOrder = async () => {
+    setLoading(true);
+    setError('');
+    
     try {
+      console.log('🔍 Initializing order page...', { restaurantId, tableId });
+      console.log('🔍 Firebase db initialized?', !!db);
+      
+      // Test Firebase connection first
+      if (!db) {
+        throw new Error('Firebase database not initialized. Please check your Firebase configuration.');
+      }
+      
       // Load restaurant profile
+      console.log('📋 Loading restaurant profile...');
       const restaurantRef = doc(db, `restaurants/${restaurantId}`);
       const restaurantSnap = await getDoc(restaurantRef);
       
       if (!restaurantSnap.exists()) {
-        throw new Error('Restaurant not found');
+        throw new Error(`Restaurant not found: ${restaurantId}. Please create the restaurant first.`);
       }
-      setRestaurant(restaurantSnap.data());
+      const restaurantData = restaurantSnap.data();
+      console.log('✅ Restaurant loaded:', restaurantData.name);
+      setRestaurant(restaurantData);
 
       // Load table info - try by document ID first, then by tableNumber
-      let tableDoc = null;
+      console.log('🪑 Loading table info...');
       let tableData = null;
       
       // Try to load by document ID
@@ -57,60 +87,89 @@ function OrderPageContent() {
       
       if (tableSnap.exists()) {
         tableData = { id: tableSnap.id, ...tableSnap.data() };
+        console.log('✅ Table loaded by ID:', tableData);
         setTable(tableData);
       } else {
         // If not found by ID, try to find by tableNumber (in case URL uses table number)
+        console.log('⚠️ Table not found by ID, searching by tableNumber...');
         const tablesRef = collection(db, `restaurants/${restaurantId}/tables`);
         const tablesSnapshot = await getDocs(tablesRef);
         
         const tableNumber = parseInt(tableId.replace('table-', '').replace(/[^0-9]/g, ''));
+        console.log('🔍 Looking for table number:', tableNumber);
+        
         if (!isNaN(tableNumber)) {
           tablesSnapshot.forEach(doc => {
             const data = doc.data();
             if (data.tableNumber === tableNumber) {
               tableData = { id: doc.id, ...data };
+              console.log('✅ Table found by number:', tableData);
               setTable(tableData);
             }
           });
         }
         
         if (!tableData) {
-          throw new Error(`Table not found. Please use a valid table ID or visit /admin/tables to view available tables.`);
+          console.error('❌ Table not found. Available tables:', tablesSnapshot.docs.map(d => d.data()));
+          throw new Error(`Table not found (${tableId}). Please use a valid table ID or visit /admin/tables to view available tables.`);
         }
       }
 
       // Load menu items
+      console.log('📋 Loading menu items...');
       const menuRef = collection(db, `restaurants/${restaurantId}/menu`);
       const menuSnapshot = await getDocs(menuRef);
       const items = menuSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      setMenuItems(items.filter(item => item.available !== false));
+      const availableItems = items.filter(item => item.available !== false);
+      console.log(`✅ Loaded ${availableItems.length} menu items`);
+      setMenuItems(availableItems);
 
       // Create or get chat session (only after table is loaded)
-      const chatSessionId = await getOrCreateChatSession();
-      if (chatSessionId) {
-        setChatId(chatSessionId);
-        // Load cart from Firestore (shared cart)
-        loadCart(chatSessionId);
+      console.log('💬 Creating/finding chat session...');
+      try {
+        const chatSessionId = await getOrCreateChatSession(tableData);
+        if (chatSessionId) {
+          setChatId(chatSessionId);
+          console.log('✅ Chat session ready:', chatSessionId);
+        }
+      } catch (chatErr) {
+        console.warn('⚠️ Chat session creation failed (non-critical):', chatErr.message);
+        // Don't block page load if chat session fails
       }
 
+      console.log('✅ Order page initialization complete!');
+      
     } catch (err) {
-      console.error('Error initializing order:', err);
+      console.error('❌ Error initializing order:', err);
+      console.error('Error details:', {
+        message: err.message,
+        code: err.code,
+        stack: err.stack
+      });
       setError(err.message || 'Failed to load order page');
     } finally {
+      console.log('🏁 Setting loading to false');
       setLoading(false);
     }
   };
 
-  const getOrCreateChatSession = async () => {
+  const getOrCreateChatSession = async (tableData) => {
     try {
       if (!restaurantId || !tableId) {
-        throw new Error('restaurantId and tableId are required for chat session');
+        console.error('Missing restaurantId or tableId');
+        return null;
       }
 
-      console.log('Creating/finding chat session for:', { restaurantId, tableId });
+      const resolvedTableData = tableData || table;
+      if (!resolvedTableData) {
+        console.error('Table data not available for chat session');
+        return null;
+      }
+
+      console.log('Creating/finding chat session for:', { restaurantId, tableId, tableData: resolvedTableData });
 
       // Check for existing active chat session for this table
       const chatSessionsRef = collection(db, `restaurants/${restaurantId}/chatSessions`);
@@ -120,8 +179,11 @@ function OrderPageContent() {
       existingSessions.forEach(doc => {
         const data = doc.data();
         // Match by tableId (can be document ID or tableNumber)
-        if ((data.tableId === tableId || data.tableId === table?.id || data.tableNumber === table?.tableNumber) && 
-            (data.status === 'active' || !data.status)) {
+        const tableIdMatch = data.tableId === tableId || data.tableId === resolvedTableData.id;
+        const tableNumberMatch = data.tableNumber === resolvedTableData.tableNumber;
+        const isActive = data.status === 'active' || !data.status;
+        
+        if ((tableIdMatch || tableNumberMatch) && isActive) {
           existingChat = { id: doc.id, ...data };
         }
       });
@@ -138,8 +200,8 @@ function OrderPageContent() {
       // Create new chat session
       console.log('Creating new chat session...');
       const chatSessionData = {
-        tableId: table?.id || tableId,
-        tableNumber: table?.tableNumber || 0,
+        tableId: resolvedTableData.id || tableId,
+        tableNumber: resolvedTableData.tableNumber || 0,
         status: 'active',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -159,8 +221,9 @@ function OrderPageContent() {
         stack: err.stack
       });
       
-      // Don't use fallback - let the error propagate so we can see what's wrong
-      throw new Error(`Failed to create chat session: ${err.message}`);
+      // Don't block page load if chat session creation fails - just return null
+      console.warn('Chat session creation failed, continuing without chat session');
+      return null;
     }
   };
 
@@ -383,8 +446,7 @@ function OrderPageContent() {
           )}
 
           {activeView === 'chat' && (
-            <div style={styles.chatSection} className="chat-section">
-              <h2 style={styles.sectionTitle} className="section-title">Ask Our AI Assistant</h2>
+            <div style={styles.chatSection} className="chat-section chatgpt-view">
               <AIChatInterface
                 restaurantId={restaurantId}
                 tableId={tableId}
@@ -398,13 +460,25 @@ function OrderPageContent() {
           )}
         </div>
 
-        <div style={styles.rightPanel} className="order-right-panel">
+        <div style={styles.rightPanel} className="order-right-panel desktop-cart">
           <Cart
             cart={cart}
             onUpdateQuantity={updateCartQuantity}
             onRemoveItem={removeFromCart}
             onPlaceOrder={placeOrder}
             placingOrder={placingOrder}
+          />
+        </div>
+
+        {/* Floating Cart for Mobile */}
+        <div className="mobile-floating-cart">
+          <FloatingCart
+            cart={cart}
+            onUpdateQuantity={updateCartQuantity}
+            onRemoveItem={removeFromCart}
+            onPlaceOrder={placeOrder}
+            placingOrder={placingOrder}
+            restaurant={restaurant}
           />
         </div>
       </div>
@@ -547,11 +621,13 @@ const styles = {
   chatSection: {
     backgroundColor: '#fff',
     borderRadius: '8px',
-    padding: '24px',
+    padding: '0',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     minHeight: '500px',
+    height: '100%',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    overflow: 'hidden'
   },
   sectionTitle: {
     fontSize: '20px',

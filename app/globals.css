@@ -11,6 +11,34 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Floating cart animations */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -72,14 +100,58 @@ html, body {
     margin-bottom: 12px;
   }
 
-  /* Chat interface - full height on mobile */
-  .chat-container {
-    height: 400px !important;
-    min-height: 400px !important;
+  /* Chat interface - full height on mobile (ChatGPT style) */
+  .chatgpt-chat-container {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 100 !important;
+    border-radius: 0 !important;
   }
 
-  .chat-messages {
-    max-height: 300px !important;
+  .chatgpt-view {
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .chatgpt-view .section-title {
+    display: none !important;
+  }
+
+  .chatgpt-messages {
+    padding-bottom: 120px !important;
+  }
+
+  .chatgpt-input-wrapper {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: white !important;
+    z-index: 101 !important;
+  }
+
+  /* Hide desktop cart on mobile */
+  .desktop-cart {
+    display: none !important;
+  }
+
+  /* Show floating cart on mobile */
+  .mobile-floating-cart {
+    display: block !important;
+  }
+
+  /* Hide right panel on mobile when chat is active */
+  .order-content {
+    grid-template-columns: 1fr !important;
   }
 
   /* Category filter - horizontal scroll on mobile */
@@ -145,28 +217,89 @@ html, body {
     min-height: 44px !important;
   }
 
-  /* Hide cart when empty on mobile (show button instead) */
-  .cart-container:has(.emptyCart) {
-    display: none;
+  /* Chat interface - full height on mobile (ChatGPT style) */
+  .chatgpt-chat-container {
+    height: calc(100vh - 180px) !important;
+    min-height: calc(100vh - 180px) !important;
+    max-height: calc(100vh - 180px) !important;
+    position: relative !important;
+    border-radius: 8px !important;
   }
 
-  /* Show floating cart button when cart is empty */
-  .floating-cart-button {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    font-size: 24px;
-    z-index: 999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .chatgpt-view {
+    padding: 0 !important;
+    margin: 0 !important;
+    height: calc(100vh - 180px) !important;
+    min-height: calc(100vh - 180px) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+  }
+
+  .chatgpt-view .section-title {
+    display: none !important;
+  }
+
+  .chatgpt-messages {
+    padding-bottom: 100px !important;
+  }
+
+  .chatgpt-input-wrapper {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: white !important;
+    z-index: 10 !important;
+    border-top: 1px solid #e5e7eb !important;
+  }
+
+  /* Hide desktop cart on mobile */
+  .desktop-cart {
+    display: none !important;
+  }
+
+  /* Show floating cart on mobile */
+  .mobile-floating-cart {
+    display: block !important;
+  }
+}
+
+/* Desktop styles */
+@media (min-width: 769px) {
+  /* Desktop - show regular cart, hide floating */
+  .mobile-floating-cart {
+    display: none !important;
+  }
+
+  /* Show desktop cart on larger screens */
+  .desktop-cart {
+    display: block !important;
+  }
+
+  /* Chat interface - normal height on desktop */
+  .chatgpt-chat-container {
+    position: relative !important;
+    height: 600px !important;
+    min-height: 600px !important;
+    max-height: 600px !important;
+    border-radius: 8px !important;
+  }
+
+  .chatgpt-view {
+    height: auto !important;
+    padding: 24px !important;
+    border-radius: 8px !important;
+  }
+
+  .chatgpt-view .section-title {
+    display: block !important;
+  }
+
+  .chatgpt-input-wrapper {
+    position: sticky !important;
+    border-radius: 0 0 8px 8px !important;
+  }
+
+  .chatgpt-messages {
+    padding-bottom: 0 !important;
   }
 }
 

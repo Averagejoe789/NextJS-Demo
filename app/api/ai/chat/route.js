@@ -18,7 +18,21 @@ export async function POST(request) {
     }
 
     // Initialize OpenAI
-    const openai = initOpenAI();
+    let openai;
+    try {
+      openai = initOpenAI();
+    } catch (error) {
+      console.error('Failed to initialize OpenAI:', error);
+      return NextResponse.json(
+        { 
+          error: 'AI service configuration error',
+          details: error.message?.includes('OPENAI_API_KEY') 
+            ? 'OpenAI API key is not configured'
+            : error.message
+        },
+        { status: 500 }
+      );
+    }
 
     // Fetch menu if not provided
     let menuItems = menu || [];
@@ -164,6 +178,12 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('AI Chat API Error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      stack: error.stack
+    });
     
     // Handle OpenAI-specific errors
     if (error.status === 429) {
@@ -173,15 +193,23 @@ export async function POST(request) {
       );
     }
     
-    if (error.status === 401) {
+    if (error.status === 401 || error.message?.includes('OPENAI_API_KEY')) {
       return NextResponse.json(
-        { error: 'AI service authentication failed.' },
+        { 
+          error: 'AI service configuration error. Please contact support.',
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        },
         { status: 500 }
       );
     }
     
+    // More detailed error message
+    const errorMessage = error.message || 'Failed to process chat message';
     return NextResponse.json(
-      { error: 'Failed to process chat message', details: error.message },
+      { 
+        error: 'Failed to process chat message',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     );
   }
