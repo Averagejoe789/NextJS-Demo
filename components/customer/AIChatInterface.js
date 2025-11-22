@@ -3,24 +3,34 @@ import { useEffect, useState, useRef } from 'react';
 import { db } from '../../lib/firebase-client';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
-export default function AIChatInterface({ restaurantId, tableId, chatId, menuItems, cart, onCartUpdate, onAddToCart }) {
+export default function AIChatInterface({ restaurantId, tableId, chatId, menuItems, cart, onCartUpdate, onAddToCart, restaurant }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  // Suggested questions for friendly UX
+  const suggestedQuestions = [
+    "What do you recommend?",
+    "Show me vegetarian options",
+    "What's your most popular dish?",
+    "I'd like to order a pizza",
+  ];
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [inputText]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Auto-focus input on mobile
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      inputRef.current?.focus();
-    }
-  }, []);
 
   // Set up Firestore listener for real-time updates
   useEffect(() => {
@@ -70,15 +80,17 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
     };
   }, [restaurantId, chatId]);
 
-  const handleSendMessage = async () => {
-    if (inputText.trim() === '' || loading) return;
+  const handleSendMessage = async (messageText = null) => {
+    const textToSend = messageText || inputText.trim();
+    if (!textToSend || loading) return;
     if (!restaurantId || !tableId || !chatId) {
       console.error('restaurantId, tableId, and chatId are required');
       return;
     }
 
-    const userMessage = inputText.trim();
-    setInputText('');
+    if (!messageText) {
+      setInputText('');
+    }
     setLoading(true);
 
     try {
@@ -89,7 +101,7 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
       );
       
       await addDoc(messagesRef, {
-        text: userMessage,
+        text: textToSend,
         sender: 'user',
         type: 'message',
         timestamp: serverTimestamp()
@@ -103,13 +115,13 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
           restaurantId,
           tableId,
           chatId,
-          message: userMessage,
+          message: textToSend,
           chatHistory: messages.slice(-20),
           menu: menuItems,
           cart: cart,
           context: {
-            restaurantName: 'Restaurant',
-            tableNumber: 1
+            restaurantName: restaurant?.name || 'Restaurant',
+            tableNumber: restaurant?.tableNumber || 1
           }
         })
       });
@@ -149,17 +161,17 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Save error message to chat
+      // Save friendly error message to chat
       const messagesRef = collection(
         db,
         `restaurants/${restaurantId}/chatSessions/${chatId}/messages`
       );
       
-      let errorMessage = 'Sorry, I encountered an error. Please try again.';
+      let errorMessage = 'Oops! 😅 Something went wrong. Could you please try again?';
       if (error.message?.includes('OPENAI_API_KEY') || error.message?.includes('configuration')) {
-        errorMessage = 'AI service is currently unavailable. Please contact support.';
+        errorMessage = 'I\'m having trouble connecting right now. Please let the staff know! 😊';
       } else if (error.message?.includes('Rate limit') || error.message?.includes('429')) {
-        errorMessage = 'Too many requests. Please wait a moment and try again.';
+        errorMessage = 'I\'m getting a lot of requests! Please wait a moment and try again. ⏱️';
       }
       
       await addDoc(messagesRef, {
@@ -180,17 +192,59 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
     }
   };
 
+  const handleSuggestedQuestion = (question) => {
+    handleSendMessage(question);
+  };
+
   return (
     <div style={styles.container} className="chatgpt-chat-container">
       {/* Messages Area */}
       <div style={styles.messagesContainer} className="chatgpt-messages">
         {messages.length === 0 ? (
           <div style={styles.welcomeMessage}>
-            <div style={styles.welcomeIcon}>💬</div>
-            <h2 style={styles.welcomeTitle}>How can I help you today?</h2>
+            <div style={styles.welcomeAvatar}>
+              <div style={styles.avatarIcon}>🤖</div>
+            </div>
+            <h2 style={styles.welcomeTitle}>
+              👋 Hi! I'm your friendly AI assistant
+            </h2>
             <p style={styles.welcomeSubtext}>
-              Ask me about menu items, dietary restrictions, or place an order!
+              I'm here to help you discover amazing dishes, answer questions about our menu, 
+              and help you place your order. What can I do for you today?
             </p>
+            
+            {/* Suggested Questions */}
+            <div style={styles.suggestionsContainer}>
+              <p style={styles.suggestionsLabel}>Try asking me:</p>
+              <div style={styles.suggestionsGrid}>
+                {suggestedQuestions.map((question, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSuggestedQuestion(question)}
+                    style={styles.suggestionButton}
+                    className="suggestion-button"
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick Info */}
+            <div style={styles.quickInfo}>
+              <div style={styles.quickInfoItem}>
+                <span style={styles.quickInfoIcon}>📋</span>
+                <span style={styles.quickInfoText}>Browse menu items</span>
+              </div>
+              <div style={styles.quickInfoItem}>
+                <span style={styles.quickInfoIcon}>🌱</span>
+                <span style={styles.quickInfoText}>Ask about allergens</span>
+              </div>
+              <div style={styles.quickInfoItem}>
+                <span style={styles.quickInfoIcon}>🛒</span>
+                <span style={styles.quickInfoText}>Order food naturally</span>
+              </div>
+            </div>
           </div>
         ) : (
           messages.map((message) => (
@@ -200,76 +254,97 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
                 ...styles.messageWrapper,
                 ...(message.sender === 'user' ? styles.userWrapper : styles.assistantWrapper)
               }}
+              className={`message-wrapper ${message.sender}`}
             >
               {message.sender === 'assistant' && (
-                <div style={styles.avatar}>🤖</div>
+                <div style={styles.assistantAvatar}>
+                  <div style={styles.avatarIcon}>🤖</div>
+                </div>
               )}
               <div
                 style={{
                   ...styles.message,
                   ...(message.sender === 'user' ? styles.userMessage : styles.assistantMessage)
                 }}
+                className={`message ${message.sender === 'user' ? 'user' : 'assistant'}`}
               >
                 {message.text.split('\n').map((line, i) => (
-                  <div key={i} style={{ marginBottom: i < message.text.split('\n').length - 1 ? '8px' : '0' }}>
+                  <div key={i} style={{ 
+                    marginBottom: i < message.text.split('\n').length - 1 ? '0.5rem' : '0',
+                    lineHeight: 1.6
+                  }}>
                     {line}
                   </div>
                 ))}
                 {message.type === 'error' && (
-                  <span style={styles.errorIndicator}> ⚠️</span>
+                  <div style={styles.errorNote}>
+                    <span style={styles.errorIcon}>⚠️</span>
+                    <span>There was an issue, but I'm here to help!</span>
+                  </div>
                 )}
               </div>
               {message.sender === 'user' && (
-                <div style={styles.userAvatar}>👤</div>
+                <div style={styles.userAvatar}>
+                  <div style={styles.userIcon}>👤</div>
+                </div>
               )}
             </div>
           ))
         )}
         {loading && (
           <div style={styles.loadingWrapper}>
-            <div style={styles.avatar}>🤖</div>
-            <div style={styles.loadingIndicator}>
-              <span style={styles.loadingDot}>●</span>
-              <span style={{ ...styles.loadingDot, animationDelay: '0.2s' }}>●</span>
-              <span style={{ ...styles.loadingDot, animationDelay: '0.4s' }}>●</span>
+            <div style={styles.assistantAvatar}>
+              <div style={styles.avatarIcon}>🤖</div>
+            </div>
+            <div style={styles.loadingBubble}>
+              <div style={styles.loadingDots}>
+                <span style={styles.loadingDot}></span>
+                <span style={{ ...styles.loadingDot, animationDelay: '0.2s' }}></span>
+                <span style={{ ...styles.loadingDot, animationDelay: '0.4s' }}></span>
+              </div>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - ChatGPT style */}
+      {/* Input Area - Friendly Design */}
       <div style={styles.inputWrapper} className="chatgpt-input-wrapper">
         <div style={styles.inputContainer}>
           <textarea
-            ref={inputRef}
+            ref={textareaRef}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyPress}
-            placeholder="Message..."
+            placeholder="Type your message... (Ask about menu, place order, or say hello!)"
             style={styles.textarea}
             disabled={loading}
             rows={1}
+            maxLength={500}
           />
           <button 
-            onClick={handleSendMessage} 
+            onClick={() => handleSendMessage()} 
             disabled={loading || !inputText.trim()}
             style={{
               ...styles.sendButton,
-              opacity: loading || !inputText.trim() ? 0.5 : 1,
-              cursor: loading || !inputText.trim() ? 'not-allowed' : 'pointer'
+              ...(loading || !inputText.trim() ? styles.sendButtonDisabled : {})
             }}
+            className="send-button"
             aria-label="Send message"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
+            {loading ? (
+              <div style={styles.sendButtonSpinner}></div>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            )}
           </button>
         </div>
         <div style={styles.inputFooter}>
           <span style={styles.footerText}>
-            AI can make mistakes. Check important info.
+            💡 Tip: Ask naturally like "I'd like 2 pizzas" or "What do you recommend?"
           </span>
         </div>
       </div>
@@ -282,166 +357,302 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    minHeight: '500px',
+    minHeight: '600px',
     backgroundColor: '#ffffff',
     position: 'relative',
     overflow: 'hidden',
-    borderRadius: '8px'
+    borderRadius: '0.5rem',
+    border: 'none',
   },
+  
   messagesContainer: {
     flex: 1,
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: '20px 0',
+    padding: '0.75rem 0.5rem',
     scrollBehavior: 'smooth',
-    WebkitOverflowScrolling: 'touch'
+    WebkitOverflowScrolling: 'touch',
+    backgroundColor: '#f9fafb',
   },
+  
+  // Welcome Message
   welcomeMessage: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    height: '100%',
-    padding: '40px 20px',
+    minHeight: '100%',
+    padding: '1.5rem 0.5rem',
     textAlign: 'center',
-    color: '#6b7280'
+    maxWidth: '100%',
+    margin: '0 auto',
   },
-  welcomeIcon: {
-    fontSize: '48px',
-    marginBottom: '16px'
+  
+  welcomeAvatar: {
+    width: '64px',
+    height: '64px',
+    borderRadius: '50%',
+    backgroundColor: '#e0f2fe',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '1.5rem',
+    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.2)',
+    animation: 'fadeIn 400ms ease-in-out',
   },
+  
+  avatarIcon: {
+    fontSize: '2rem',
+  },
+  
   welcomeTitle: {
-    fontSize: '24px',
-    fontWeight: '600',
+    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+    fontWeight: 700,
     color: '#111827',
-    margin: '0 0 8px 0'
+    margin: '0 0 0.75rem 0',
+    lineHeight: 1.3,
   },
+  
   welcomeSubtext: {
-    fontSize: '16px',
+    fontSize: 'clamp(0.875rem, 2vw, 1rem)',
     color: '#6b7280',
-    margin: 0,
-    maxWidth: '500px'
+    margin: '0 0 2rem 0',
+    lineHeight: 1.6,
+    maxWidth: '500px',
   },
+  
+  // Suggested Questions
+  suggestionsContainer: {
+    width: '100%',
+    marginBottom: '2rem',
+  },
+  
+  suggestionsLabel: {
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    color: '#374151',
+    marginBottom: '0.75rem',
+    textAlign: 'left',
+  },
+  
+  suggestionsGrid: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    alignItems: 'stretch',
+  },
+  
+  suggestionButton: {
+    padding: '0.75rem 1.25rem',
+    backgroundColor: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '0.75rem',
+    fontSize: '0.875rem',
+    fontWeight: 500,
+    color: '#374151',
+    cursor: 'pointer',
+    transition: 'all 200ms ease-in-out',
+    textAlign: 'left',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+    minHeight: '44px', // Touch-friendly
+  },
+  
+  // Quick Info
+  quickInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.625rem',
+    width: '100%',
+    padding: '0.875rem',
+    backgroundColor: '#ffffff',
+    borderRadius: '0.75rem',
+    border: '1px solid #e5e7eb',
+    marginTop: '1rem',
+  },
+  
+  quickInfoItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    fontSize: '0.875rem',
+    color: '#6b7280',
+  },
+  
+  quickInfoIcon: {
+    fontSize: '1.25rem',
+  },
+  
+  quickInfoText: {
+    fontSize: '0.875rem',
+    fontWeight: 500,
+  },
+  
+  // Message Wrappers
   messageWrapper: {
     display: 'flex',
-    gap: '12px',
-    padding: '20px',
+    gap: '0.5rem',
+    padding: '0.5rem 0.5rem',
     alignItems: 'flex-start',
-    maxWidth: '100%'
+    maxWidth: '100%',
+    animation: 'fadeIn 300ms ease-in-out',
   },
+  
   userWrapper: {
-    backgroundColor: '#ffffff',
-    justifyContent: 'flex-end'
+    flexDirection: 'row-reverse',
   },
+  
   assistantWrapper: {
-    backgroundColor: '#f9fafb',
+    flexDirection: 'row',
   },
-  avatar: {
-    width: '32px',
-    height: '32px',
-    borderRadius: '4px',
-    backgroundColor: '#10a37f',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '18px',
-    flexShrink: 0
-  },
-  userAvatar: {
-    width: '32px',
-    height: '32px',
+  
+  // Avatars
+  assistantAvatar: {
+    width: '28px',
+    height: '28px',
     borderRadius: '50%',
-    backgroundColor: '#007bff',
+    backgroundColor: '#e0f2fe',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '18px',
-    flexShrink: 0
+    flexShrink: 0,
   },
-  message: {
-    maxWidth: '85%',
-    wordWrap: 'break-word',
-    lineHeight: '1.75',
-    fontSize: '16px',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    whiteSpace: 'pre-wrap'
+  
+  userAvatar: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    backgroundColor: '#0284c7',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
-  userMessage: {
-    backgroundColor: '#007bff',
+  
+  userIcon: {
+    fontSize: '1.125rem',
     color: '#ffffff',
-    borderTopRightRadius: '2px'
   },
+  
+  // Messages
+  message: {
+    maxWidth: '92%',
+    wordWrap: 'break-word',
+    lineHeight: 1.6,
+    fontSize: '0.9375rem',
+    padding: '0.75rem 1rem',
+    borderRadius: '0.75rem',
+    whiteSpace: 'pre-wrap',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+  },
+  
+  userMessage: {
+    backgroundColor: '#0284c7',
+    color: '#ffffff',
+    borderBottomRightRadius: '0.25rem',
+  },
+  
   assistantMessage: {
     backgroundColor: '#ffffff',
     color: '#374151',
-    border: '1px solid #e5e7eb',
-    borderTopLeftRadius: '2px'
+    border: 'none',
+    borderBottomLeftRadius: '0.25rem',
   },
-  errorIndicator: {
-    marginLeft: '8px',
-    fontSize: '18px'
+  
+  errorNote: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    marginTop: '0.5rem',
+    padding: '0.5rem',
+    backgroundColor: '#fef2f2',
+    borderRadius: '0.5rem',
+    fontSize: '0.875rem',
+    color: '#dc2626',
   },
+  
+  errorIcon: {
+    fontSize: '1rem',
+  },
+  
+  // Loading State
   loadingWrapper: {
     display: 'flex',
-    gap: '12px',
-    padding: '20px',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb'
+    gap: '0.5rem',
+    padding: '0.5rem 0.5rem',
+    alignItems: 'flex-start',
   },
-  loadingIndicator: {
-    display: 'flex',
-    gap: '4px',
-    alignItems: 'center',
-    padding: '12px 16px',
+  
+  loadingBubble: {
+    padding: '0.75rem 1rem',
     backgroundColor: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px'
+    border: 'none',
+    borderRadius: '0.75rem',
+    borderBottomLeftRadius: '0.25rem',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
+  
+  loadingDots: {
+    display: 'flex',
+    gap: '0.375rem',
+    alignItems: 'center',
+  },
+  
   loadingDot: {
-    fontSize: '12px',
-    color: '#9ca3af',
-    animation: 'pulse 1.4s ease-in-out infinite'
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    backgroundColor: '#9ca3af',
+    animation: 'pulse 1.4s ease-in-out infinite',
   },
+  
+  // Input Area
   inputWrapper: {
     borderTop: '1px solid #e5e7eb',
     backgroundColor: '#ffffff',
-    padding: '12px 16px',
+    padding: '0.75rem 0.5rem',
     position: 'sticky',
     bottom: 0,
-    zIndex: 10
+    zIndex: 10,
   },
+  
   inputContainer: {
     display: 'flex',
     alignItems: 'flex-end',
-    gap: '8px',
+    gap: '0.5rem',
     backgroundColor: '#f9fafb',
     border: '1px solid #e5e7eb',
-    borderRadius: '24px',
-    padding: '8px 12px',
-    maxWidth: '100%',
-    marginBottom: '8px'
+    borderRadius: '1.25rem',
+    padding: '0.625rem 0.875rem',
+    transition: 'all 200ms ease-in-out',
+    marginBottom: '0.5rem',
   },
+  
+  inputContainerFocused: {
+    borderColor: '#0284c7',
+    boxShadow: '0 0 0 3px rgba(2, 132, 199, 0.1)',
+  },
+  
   textarea: {
     flex: 1,
     border: 'none',
     outline: 'none',
     backgroundColor: 'transparent',
-    fontSize: '16px',
+    fontSize: '0.9375rem',
     fontFamily: 'inherit',
     resize: 'none',
-    maxHeight: '200px',
+    maxHeight: '120px',
     overflowY: 'auto',
-    padding: '4px 0',
-    lineHeight: '1.5',
+    padding: '0',
+    lineHeight: 1.5,
     color: '#111827',
-    minHeight: '24px'
+    minHeight: '24px',
   },
+  
   sendButton: {
-    width: '32px',
-    height: '32px',
+    width: '40px',
+    height: '40px',
     borderRadius: '50%',
-    backgroundColor: '#007bff',
+    backgroundColor: '#0284c7',
     color: '#ffffff',
     border: 'none',
     display: 'flex',
@@ -449,14 +660,36 @@ const styles = {
     justifyContent: 'center',
     cursor: 'pointer',
     flexShrink: 0,
-    transition: 'background-color 0.2s'
+    transition: 'all 200ms ease-in-out',
+    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.3)',
+    minWidth: '44px', // Touch-friendly
+    minHeight: '44px',
   },
+  
+  sendButtonDisabled: {
+    backgroundColor: '#d1d5db',
+    cursor: 'not-allowed',
+    boxShadow: 'none',
+    opacity: 0.5,
+  },
+  
+  sendButtonSpinner: {
+    width: '20px',
+    height: '20px',
+    border: '2px solid rgba(255, 255, 255, 0.3)',
+    borderTopColor: '#ffffff',
+    borderRadius: '50%',
+    animation: 'spin 600ms linear infinite',
+  },
+  
   inputFooter: {
     textAlign: 'center',
-    paddingTop: '8px'
+    paddingTop: '0.5rem',
   },
+  
   footerText: {
-    fontSize: '12px',
-    color: '#9ca3af'
-  }
+    fontSize: '0.75rem',
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
 };

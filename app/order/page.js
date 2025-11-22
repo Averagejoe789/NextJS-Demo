@@ -399,21 +399,36 @@ function OrderPageContent() {
 
   return (
     <div style={styles.container}>
+      {/* Header - Modern Design */}
       <div style={styles.header} className="order-header">
-        <div style={styles.restaurantInfo}>
-          {restaurant?.logoUrl && (
-            <img src={restaurant.logoUrl} alt={restaurant.name} style={styles.logo} className="restaurant-logo" />
-          )}
-          <div>
-            <h1 style={styles.restaurantName} className="restaurant-name">{restaurant?.name || 'Restaurant'}</h1>
-            {table && (
-              <p style={styles.tableInfo}>Table {table.tableNumber}</p>
+        <div style={styles.headerContent}>
+          <div style={styles.restaurantInfo}>
+            {restaurant?.logoUrl && (
+              <div style={styles.logoContainer}>
+                <img 
+                  src={restaurant.logoUrl} 
+                  alt={restaurant.name} 
+                  style={styles.logo} 
+                  className="restaurant-logo" 
+                />
+              </div>
             )}
+            <div style={styles.restaurantDetails}>
+              <h1 style={styles.restaurantName} className="restaurant-name">
+                {restaurant?.name || 'Restaurant'}
+              </h1>
+              {table && (
+                <div style={styles.tableBadge}>
+                  <span style={styles.tableIcon}>🪑</span>
+                  <span style={styles.tableText}>Table {table.tableNumber}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Toggle buttons for switching between menu and chat */}
+      {/* View Toggle - Modern Tabs */}
       <div style={styles.viewToggle} className="view-toggle">
         <button
           onClick={() => setActiveView('menu')}
@@ -421,9 +436,10 @@ function OrderPageContent() {
             ...styles.toggleButton,
             ...(activeView === 'menu' ? styles.toggleButtonActive : styles.toggleButtonInactive)
           }}
-          className="toggle-button"
+          className={`toggle-button ${activeView === 'menu' ? 'active' : ''}`}
         >
-          📋 Menu
+          <span style={styles.toggleIcon}>📋</span>
+          <span style={styles.toggleText}>Menu</span>
         </button>
         <button
           onClick={() => setActiveView('chat')}
@@ -431,24 +447,24 @@ function OrderPageContent() {
             ...styles.toggleButton,
             ...(activeView === 'chat' ? styles.toggleButtonActive : styles.toggleButtonInactive)
           }}
-          className="toggle-button"
+          className={`toggle-button ${activeView === 'chat' ? 'active' : ''}`}
         >
-          💬 AI Assistant
+          <span style={styles.toggleIcon}>💬</span>
+          <span style={styles.toggleText}>AI Assistant</span>
         </button>
       </div>
 
       <div style={styles.content} className="order-content">
         <div style={styles.leftPanel} className="order-left-panel">
-          {activeView === 'menu' && (
-            <div style={styles.menuSection} className="menu-section">
-              <h2 style={styles.sectionTitle} className="section-title">Menu</h2>
-              <MenuDisplay menuItems={menuItems} onAddToCart={addToCart} />
-            </div>
-          )}
+            {activeView === 'menu' && (
+              <div style={styles.menuSection} className="menu-section">
+                <MenuDisplay menuItems={menuItems} onAddToCart={addToCart} />
+              </div>
+            )}
 
-          {activeView === 'chat' && (
-            <div style={styles.chatSection} className="chat-section chatgpt-view">
-              <AIChatInterface
+            {activeView === 'chat' && (
+              <div style={styles.chatSection} className="chat-section chatgpt-view">
+                <AIChatInterface
                 restaurantId={restaurantId}
                 tableId={tableId}
                 chatId={chatId}
@@ -456,6 +472,7 @@ function OrderPageContent() {
                 cart={cart}
                 onCartUpdate={setCart}
                 onAddToCart={addToCart}
+                restaurant={restaurant}
               />
             </div>
           )}
@@ -498,7 +515,7 @@ export default function OrderPage() {
 const styles = {
   container: {
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5'
+    backgroundColor: '#f9fafb'
   },
   loadingContainer: {
     display: 'flex',
@@ -527,75 +544,122 @@ const styles = {
     maxWidth: '500px'
   },
   header: {
-    backgroundColor: '#fff',
-    borderBottom: '1px solid #e0e0e0',
-    padding: '20px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    backgroundColor: '#ffffff',
+    borderBottom: '1px solid #e5e7eb',
+    padding: '1rem 1.5rem',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
     position: 'sticky',
     top: 0,
-    zIndex: 100
+    zIndex: 100,
+    backdropFilter: 'blur(10px)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  },
+  headerContent: {
+    maxWidth: '1400px',
+    margin: '0 auto',
   },
   restaurantInfo: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    maxWidth: '1200px',
-    margin: '0 auto'
+    gap: '1rem',
+  },
+  logoContainer: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '0.75rem',
+    overflow: 'hidden',
+    flexShrink: 0,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#f3f4f6',
   },
   logo: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '8px',
+    width: '100%',
+    height: '100%',
     objectFit: 'cover',
-    className: 'restaurant-logo'
+    display: 'block',
+  },
+  restaurantDetails: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    flex: 1,
+    minWidth: 0,
   },
   restaurantName: {
-    fontSize: '24px',
-    fontWeight: 'bold',
+    fontSize: '1.5rem',
+    fontWeight: 700,
     margin: 0,
-    color: '#333',
-    className: 'restaurant-name'
+    color: '#111827',
+    lineHeight: 1.2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-  tableInfo: {
-    fontSize: '14px',
-    color: '#666',
-    margin: '4px 0 0 0'
+  tableBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    padding: '0.25rem 0.75rem',
+    backgroundColor: '#e0f2fe',
+    color: '#0284c7',
+    borderRadius: '9999px',
+    fontSize: '0.875rem',
+    fontWeight: 500,
+    width: 'fit-content',
+  },
+  tableIcon: {
+    fontSize: '0.875rem',
+  },
+  tableText: {
+    fontSize: '0.875rem',
   },
   viewToggle: {
     display: 'flex',
-    gap: '8px',
-    padding: '12px 20px',
-    backgroundColor: '#fff',
-    borderBottom: '1px solid #e0e0e0',
+    gap: '0.5rem',
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#ffffff',
+    borderBottom: '1px solid #e5e7eb',
     justifyContent: 'center',
     position: 'sticky',
-    top: '80px',
+    top: '73px',
     zIndex: 99,
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+    backdropFilter: 'blur(10px)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
   },
   toggleButton: {
     flex: 1,
-    padding: '12px 24px',
-    border: '2px solid #e0e0e0',
-    borderRadius: '8px',
-    backgroundColor: '#fff',
-    color: '#666',
-    fontSize: '16px',
-    fontWeight: '500',
+    maxWidth: '200px',
+    padding: '0.875rem 1.5rem',
+    border: 'none',
+    borderRadius: '0.75rem',
+    backgroundColor: 'transparent',
+    color: '#6b7280',
+    fontSize: '0.9375rem',
+    fontWeight: 600,
     cursor: 'pointer',
-    transition: 'all 0.2s',
-    minHeight: '44px'
+    transition: 'all 200ms ease-in-out',
+    minHeight: '48px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    position: 'relative',
   },
   toggleButtonActive: {
-    backgroundColor: '#007bff',
-    color: '#fff',
-    borderColor: '#007bff',
-    boxShadow: '0 2px 4px rgba(0,123,255,0.3)'
+    backgroundColor: '#0284c7',
+    color: '#ffffff',
+    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.3)',
   },
   toggleButtonInactive: {
-    backgroundColor: '#f8f9fa',
-    color: '#666',
-    borderColor: '#e0e0e0'
+    backgroundColor: 'transparent',
+    color: '#6b7280',
+  },
+  toggleIcon: {
+    fontSize: '1.125rem',
+  },
+  toggleText: {
+    fontSize: '0.9375rem',
   },
   content: {
     maxWidth: '1400px',
@@ -614,27 +678,23 @@ const styles = {
     height: 'fit-content'
   },
   menuSection: {
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    padding: '24px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    backgroundColor: '#ffffff',
+    borderRadius: '1rem',
+    padding: '1.5rem',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e5e7eb',
   },
   chatSection: {
-    backgroundColor: '#fff',
-    borderRadius: '8px',
+    backgroundColor: '#ffffff',
+    borderRadius: '0.5rem',
     padding: '0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    minHeight: '500px',
+    boxShadow: 'none',
+    minHeight: '600px',
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    border: 'none',
   },
-  sectionTitle: {
-    fontSize: '20px',
-    fontWeight: '600',
-    marginBottom: '20px',
-    color: '#333'
-  }
 };
 
