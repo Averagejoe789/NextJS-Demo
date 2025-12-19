@@ -357,3 +357,87 @@ html {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 }
+
+/* Admin Sidebar Styles */
+/* Mobile: Sidebar hidden by default, overlay shown when open */
+@media (max-width: 767px) {
+  .admin-sidebar-overlay {
+    display: block !important;
+  }
+
+  .admin-sidebar.closed {
+    transform: translateX(-100%) !important;
+  }
+
+  .admin-sidebar.open {
+    transform: translateX(0) !important;
+  }
+
+  /* Hide toggle button on desktop, show close button on mobile */
+  .sidebar-toggle-button {
+    display: none !important;
+  }
+
+  .sidebar-close-button {
+    display: flex !important;
+  }
+
+  /* Main content full width on mobile */
+  main {
+    margin-left: 0 !important;
+  }
+
+  /* Show mobile menu button */
+  .mobile-menu-button {
+    display: flex !important;
+  }
+}
+
+/* Desktop: Sidebar can be toggled */
+@media (min-width: 768px) {
+  .admin-sidebar-overlay {
+    display: none !important;
+  }
+
+  /* Allow sidebar to be collapsed on desktop - respect inline styles */
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .admin-sidebar.closed {
+    transform: translateX(-100%);
+  }
+
+  /* Show toggle button on desktop, hide close button */
+  .sidebar-toggle-button {
+    display: flex !important;
+  }
+
+  .sidebar-close-button {
+    display: none !important;
+  }
+
+  /* Main content margin is controlled by inline styles in layout.js */
+
+  /* Hide mobile menu button on desktop */
+  .mobile-menu-button {
+    display: none !important;
+  }
+}
+
+/* Sidebar hover effects */
+.sidebar-toggle-button:hover {
+  background-color: #e5e7eb;
+}
+
+.sidebar-close-button:hover {
+  background-color: #e5e7eb;
+}
+
+.nav-item:hover {
+  background-color: #f3f4f6;
+}
+
+.logout-button:hover {
+  background-color: #fecaca;
+}
