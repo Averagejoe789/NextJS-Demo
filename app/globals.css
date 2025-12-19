@@ -441,3 +441,51 @@ html {
 .logout-button:hover {
   background-color: #fecaca;
 }
+
+/* Table Management UI Enhancements */
+.download-button:hover,
+.view-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.download-button:active,
+.view-button:active {
+  transform: translateY(0);
+}
+
+.copy-button:hover,
+.open-link-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.copy-button:active,
+.open-link-button:active {
+  transform: translateY(0);
+}
+
+.delete-button:hover {
+  background-color: #b91c1c !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3) !important;
+}
+
+.delete-button:active {
+  transform: translateY(0);
+}
+
+.table-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+.url-input:hover {
+  border-color: #0284c7 !important;
+}
+
+.url-input:focus {
+  outline: none;
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1) !important;
+}

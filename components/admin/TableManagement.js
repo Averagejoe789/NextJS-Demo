@@ -236,7 +236,7 @@ export default function TableManagement() {
         ) : (
           <div style={styles.tablesGrid}>
             {tables.map((table) => (
-              <div key={table.id} style={styles.tableCard}>
+              <div key={table.id} style={styles.tableCard} className="table-card">
                 <div style={styles.tableHeader}>
                   <h3 style={styles.tableNumber}>Table {table.tableNumber}</h3>
                   <span style={{
@@ -255,12 +255,14 @@ export default function TableManagement() {
                       <button
                         onClick={() => downloadQRCode(table.qrCodeUrl, table.tableNumber)}
                         style={styles.downloadButton}
+                        className="download-button"
                       >
                         Download QR Code
                       </button>
                       <button
                         onClick={() => window.open(table.qrCodeUrl, '_blank')}
                         style={styles.viewButton}
+                        className="view-button"
                       >
                         View Full Size
                       </button>
@@ -268,22 +270,70 @@ export default function TableManagement() {
                   </div>
                 )}
                 
-                {table.qrCodeData && (
-                  <div style={styles.qrUrl}>
-                    <label style={styles.label}>QR Code URL:</label>
-                    <input
-                      type="text"
-                      value={table.qrCodeData}
-                      readOnly
-                      style={styles.urlInput}
-                      onClick={(e) => e.target.select()}
-                    />
-                  </div>
-                )}
+                {(() => {
+                  const restaurantId = getRestaurantId();
+                  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                  const tableLink = table.qrCodeData || (baseUrl ? `${baseUrl}/order?restaurantId=${restaurantId}&tableId=${table.id}` : '');
+                  
+                  if (!tableLink) return null;
+                  
+                  return (
+                    <div style={styles.linkSection}>
+                      <div style={styles.linkHeader}>
+                        <span style={styles.linkIcon}>🔗</span>
+                        <span style={styles.linkLabel}>Customer Ordering Link</span>
+                      </div>
+                      <div style={styles.linkContainer}>
+                        <input
+                          type="text"
+                          value={tableLink}
+                          readOnly
+                          style={styles.urlInput}
+                          className="url-input"
+                          onClick={(e) => e.target.select()}
+                        />
+                        <div style={styles.linkButtons}>
+                          <button
+                            onClick={(e) => {
+                              navigator.clipboard.writeText(tableLink);
+                              const btn = e.target;
+                              const originalText = btn.textContent;
+                              btn.textContent = '✓ Copied!';
+                              btn.style.backgroundColor = '#16a34a';
+                              setTimeout(() => {
+                                btn.textContent = originalText;
+                                btn.style.backgroundColor = '#0284c7';
+                              }, 2000);
+                            }}
+                            style={styles.copyButton}
+                            className="copy-button"
+                            title="Copy link"
+                          >
+                            📋 Copy
+                          </button>
+                          <a
+                            href={tableLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={styles.openLinkButton}
+                            className="open-link-button"
+                            title="Open in new tab"
+                          >
+                            🔗 Open
+                          </a>
+                        </div>
+                      </div>
+                      <p style={styles.linkHelpText}>
+                        Share this link with customers or scan the QR code above
+                      </p>
+                    </div>
+                  );
+                })()}
                 
                 <button
                   onClick={() => deleteTable(table.id)}
                   style={styles.deleteButton}
+                  className="delete-button"
                 >
                   Delete Table
                 </button>
@@ -395,91 +445,188 @@ const styles = {
   },
   tablesGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '20px',
-    marginTop: '20px',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+    gap: '24px',
+    marginTop: '24px',
   },
   tableCard: {
-    border: '1px solid #e0e0e0',
-    borderRadius: '8px',
-    padding: '20px',
-    backgroundColor: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '12px',
+    padding: '24px',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    transition: 'all 0.2s ease-in-out',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
   },
   tableHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '16px',
+    paddingBottom: '16px',
+    borderBottom: '2px solid #f3f4f6',
   },
   tableNumber: {
-    fontSize: '18px',
-    fontWeight: '600',
+    fontSize: '20px',
+    fontWeight: '700',
     margin: 0,
-    color: '#333',
+    color: '#111827',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   statusBadge: {
-    padding: '4px 12px',
-    borderRadius: '12px',
+    padding: '6px 14px',
+    borderRadius: '20px',
     fontSize: '12px',
-    fontWeight: '500',
+    fontWeight: '600',
     color: 'white',
     textTransform: 'capitalize',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   qrSection: {
-    marginBottom: '16px',
     textAlign: 'center',
+    padding: '16px',
+    backgroundColor: '#f9fafb',
+    borderRadius: '10px',
+    border: '1px solid #e5e7eb',
   },
   qrImage: {
-    width: '200px',
-    height: '200px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    marginBottom: '12px',
+    width: '180px',
+    height: '180px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    marginBottom: '16px',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+    backgroundColor: '#ffffff',
   },
   qrActions: {
     display: 'flex',
-    gap: '8px',
+    gap: '10px',
     justifyContent: 'center',
+    flexWrap: 'wrap',
   },
   downloadButton: {
-    padding: '8px 16px',
-    backgroundColor: '#28a745',
+    padding: '10px 20px',
+    backgroundColor: '#16a34a',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
     fontSize: '14px',
+    fontWeight: '600',
     cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
   },
   viewButton: {
-    padding: '8px 16px',
-    backgroundColor: '#17a2b8',
+    padding: '10px 20px',
+    backgroundColor: '#0284c7',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
     fontSize: '14px',
+    fontWeight: '600',
     cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
   },
-  qrUrl: {
-    marginBottom: '16px',
+  linkSection: {
+    padding: '20px',
+    backgroundColor: '#f0f9ff',
+    borderRadius: '10px',
+    border: '2px solid #bae6fd',
+  },
+  linkHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '12px',
+  },
+  linkIcon: {
+    fontSize: '18px',
+  },
+  linkLabel: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#0369a1',
+  },
+  linkContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
   },
   urlInput: {
     width: '100%',
-    padding: '8px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '12px',
+    padding: '12px 16px',
+    border: '2px solid #bae6fd',
+    borderRadius: '8px',
+    fontSize: '13px',
     fontFamily: 'monospace',
+    backgroundColor: '#ffffff',
+    color: '#0284c7',
+    fontWeight: '500',
+    boxSizing: 'border-box',
+    transition: 'all 0.2s ease-in-out',
+  },
+  linkButtons: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap',
+  },
+  copyButton: {
+    flex: 1,
+    minWidth: '100px',
+    padding: '12px 20px',
+    backgroundColor: '#0284c7',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
+  },
+  openLinkButton: {
+    flex: 1,
+    minWidth: '100px',
+    padding: '12px 20px',
+    backgroundColor: '#16a34a',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.2s ease-in-out',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
+  },
+  linkHelpText: {
+    fontSize: '12px',
+    color: '#0369a1',
+    marginTop: '12px',
+    marginBottom: 0,
+    textAlign: 'center',
   },
   deleteButton: {
     width: '100%',
-    padding: '8px',
-    backgroundColor: '#dc3545',
+    padding: '12px',
+    backgroundColor: '#dc2626',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
     fontSize: '14px',
+    fontWeight: '600',
     cursor: 'pointer',
-    marginTop: '8px',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
   },
   emptyState: {
     textAlign: 'center',
