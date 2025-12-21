@@ -97,21 +97,29 @@ export default function AdminLayout({ children }) {
   }
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className={!sidebarOpen && isDesktop ? 'sidebar-closed' : ''}>
       <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <main style={{
         ...styles.main,
         marginLeft: sidebarOpen && isDesktop ? '260px' : '0',
       }}>
-        {/* Mobile hamburger button */}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          style={styles.mobileMenuButton}
-          className="mobile-menu-button"
-          aria-label="Toggle menu"
+        {/* Mobile header with hamburger button */}
+        <header 
+          style={{
+            ...styles.mobileHeader,
+            left: sidebarOpen && isDesktop ? '260px' : '0',
+          }} 
+          className="mobile-header"
         >
-          <span style={styles.hamburgerIcon}>☰</span>
-        </button>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={styles.mobileMenuButton}
+            className="mobile-menu-button"
+            aria-label="Toggle menu"
+          >
+            <span style={styles.hamburgerIcon}>☰</span>
+          </button>
+        </header>
         {children}
       </main>
     </div>
@@ -142,12 +150,22 @@ const styles = {
     width: '100%',
     maxWidth: '100%',
   },
-  mobileMenuButton: {
-    display: 'block', // Shown on mobile via CSS
+  mobileHeader: {
+    display: 'block',
     position: 'fixed',
-    top: '16px',
-    left: '16px',
-    zIndex: 997,
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    backgroundColor: '#ffffff',
+    borderBottom: '1px solid #e5e7eb',
+    padding: '16px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+  },
+  mobileMenuButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     width: '44px',
     height: '44px',
     backgroundColor: '#ffffff',
@@ -155,8 +173,6 @@ const styles = {
     borderRadius: '8px',
     cursor: 'pointer',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
     transition: 'all 200ms ease-in-out',
   },
   hamburgerIcon: {

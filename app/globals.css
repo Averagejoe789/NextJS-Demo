@@ -7,8 +7,13 @@
 
 /* Loading spinner animation */
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Floating cart animations */
@@ -16,6 +21,7 @@
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
   }
@@ -26,6 +32,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -33,9 +40,12 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.4;
   }
+
   50% {
     opacity: 1;
   }
@@ -46,6 +56,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -53,17 +64,22 @@
 }
 
 @keyframes bounce {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     transform: translateY(0);
     opacity: 0.7;
   }
+
   40% {
     transform: translateY(-6px);
     opacity: 1;
   }
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -216,19 +232,19 @@ html {
     padding: 3rem 1rem !important;
     text-align: center !important;
   }
-  
+
   .hero-content-wrapper {
     align-items: center;
   }
-  
+
   .hero-badge {
     margin: 0 auto !important;
   }
-  
+
   .hero-subtitle {
     max-width: 100% !important;
   }
-  
+
   .hero-buttons-wrapper {
     justify-content: center !important;
   }
@@ -741,20 +757,20 @@ html {
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
   }
-  
+
   .menu-item-image-wrapper {
     height: 180px;
   }
-  
+
   .menu-item-content {
     padding: 1rem;
     gap: 0.625rem;
   }
-  
+
   .menu-item-name {
     font-size: 1.125rem;
   }
-  
+
   .menu-item-description {
     font-size: 0.875rem;
   }
@@ -765,27 +781,27 @@ html {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.5rem;
   }
-  
+
   .menu-item-image-wrapper {
     height: 200px;
   }
-  
+
   .menu-item-content {
     padding: 1.25rem;
     gap: 0.75rem;
   }
-  
+
   .menu-category-section {
     top: 80px;
     padding: 1rem 0;
     margin-bottom: 1.5rem;
   }
-  
+
   .menu-category-filter {
     gap: 0.75rem;
     padding: 0 1rem;
   }
-  
+
   .menu-category-button {
     padding: 0.625rem 1.25rem;
   }
@@ -793,6 +809,7 @@ html {
 
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
+
   /* Order page - stack layout on mobile */
   .order-content {
     grid-template-columns: 1fr !important;
@@ -823,7 +840,7 @@ html {
     top: auto !important;
     z-index: 1000;
     border-radius: 16px 16px 0 0 !important;
-    box-shadow: 0 -4px 12px rgba(0,0,0,0.15) !important;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15) !important;
     max-height: 60vh;
     overflow-y: auto;
   }
@@ -851,15 +868,15 @@ html {
     box-sizing: border-box !important;
     margin: 0 !important;
   }
-  
+
   /* Order container - prevent overflow */
-  .order-content > div {
+  .order-content>div {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
   }
-  
+
   /* Ensure menu container doesn't overflow */
   .menu-display-container {
     width: 100% !important;
@@ -867,7 +884,7 @@ html {
     overflow-x: hidden !important;
     box-sizing: border-box !important;
   }
-  
+
   /* Category section - prevent overflow */
   .menu-category-section {
     width: 100% !important;
@@ -875,7 +892,7 @@ html {
     overflow-x: hidden !important;
     box-sizing: border-box !important;
   }
-  
+
   /* Category filter - ensure proper scrolling on mobile (internal scroll only) */
   .menu-category-filter {
     padding: 0 0.5rem !important;
@@ -883,7 +900,7 @@ html {
     max-width: 100% !important;
     box-sizing: border-box !important;
   }
-  
+
   /* Menu grid - single column on mobile */
   .menu-grid-container {
     grid-template-columns: 1fr !important;
@@ -894,7 +911,7 @@ html {
     overflow-x: hidden !important;
     box-sizing: border-box !important;
   }
-  
+
   /* Menu item - full width on mobile */
   .menu-item-card {
     width: 100% !important;
@@ -903,7 +920,7 @@ html {
     min-width: 0 !important;
     box-sizing: border-box !important;
   }
-  
+
   /* Ensure all content inside cards doesn't overflow */
   .menu-item-content {
     max-width: 100% !important;
@@ -911,13 +928,13 @@ html {
     word-wrap: break-word !important;
     box-sizing: border-box !important;
   }
-  
+
   .menu-item-name {
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
     max-width: 100% !important;
   }
-  
+
   .menu-item-description {
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
@@ -955,19 +972,19 @@ html {
     padding-bottom: 0.5rem !important;
     margin-bottom: 0 !important;
   }
-  
+
   /* View Toggle - Full width on mobile */
   .view-toggle {
     padding: 0.75rem 1rem !important;
     gap: 0.5rem !important;
   }
-  
+
   .toggle-button {
     padding: 0.875rem 1rem !important;
     min-height: 48px !important;
     font-size: 0.875rem !important;
   }
-  
+
   .toggle-button .toggle-icon {
     font-size: 1rem !important;
   }
@@ -992,7 +1009,7 @@ html {
     box-sizing: border-box !important;
     overflow-x: hidden !important;
   }
-  
+
   /* Ensure left panel doesn't overflow */
   .order-left-panel {
     width: 100% !important;
@@ -1001,7 +1018,7 @@ html {
     box-sizing: border-box !important;
     overflow-x: hidden !important;
   }
-  
+
   /* Menu section - ensure it fits within viewport */
   .menu-section {
     width: 100% !important;
@@ -1035,36 +1052,38 @@ html {
     touch-action: manipulation;
     -webkit-tap-highlight-color: rgba(2, 132, 199, 0.1);
   }
-  
+
   /* Menu section - better spacing on mobile */
   .menu-section {
     padding: 1rem !important;
   }
-  
+
   /* Cart improvements for mobile */
   .cart-container {
     border-radius: 1rem !important;
   }
-  
+
   /* Toggle buttons - better spacing and interactions */
   .toggle-button.active {
     background-color: #0284c7 !important;
     color: white !important;
     box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3) !important;
   }
-  
+
   .toggle-button:hover:not(.active) {
     background-color: #f3f4f6 !important;
     transform: translateY(-1px);
   }
-  
+
   .toggle-button:active {
     transform: translateY(0);
   }
 
   /* Input fields - larger on mobile */
-  input, textarea {
-    font-size: 16px !important; /* Prevents zoom on iOS */
+  input,
+  textarea {
+    font-size: 16px !important;
+    /* Prevents zoom on iOS */
     min-height: 44px !important;
   }
 
@@ -1077,7 +1096,7 @@ html {
     top: auto !important;
     max-height: 70vh !important;
     border-radius: 20px 20px 0 0 !important;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.2) !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2) !important;
     padding: 16px !important;
     z-index: 1000;
     overflow-y: auto;
@@ -1196,6 +1215,7 @@ html {
 
 /* Desktop styles */
 @media (min-width: 769px) {
+
   /* Desktop - show regular cart, hide floating */
   .mobile-floating-cart {
     display: none !important;
@@ -1246,7 +1266,7 @@ html {
     width: 100% !important;
     box-sizing: border-box !important;
   }
-  
+
   .order-left-panel {
     width: 100% !important;
     max-width: 100% !important;
@@ -1330,6 +1350,7 @@ html {
 
 /* Safe area for iOS notch */
 @supports (padding: max(0px)) {
+
   .order-header,
   .cart-container,
   .order-right-panel {
@@ -1344,6 +1365,29 @@ html {
 }
 
 /* Admin Sidebar Styles */
+/* Base header styles - visible by default */
+.mobile-header {
+  display: block !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 16px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Base sidebar toggle button - visible on desktop by default */
+.sidebar-toggle-button {
+  display: flex !important;
+}
+
+.sidebar-close-button {
+  display: none !important;
+}
+
 /* Mobile: Sidebar hidden by default, overlay shown when open */
 @media (max-width: 767px) {
   .admin-sidebar-overlay {
@@ -1370,11 +1414,37 @@ html {
   /* Main content full width on mobile */
   main {
     margin-left: 0 !important;
+    padding-top: 80px !important;
+    /* Add space for fixed header */
+  }
+
+  /* Show mobile header */
+  .mobile-header {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    padding: 16px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
   }
 
   /* Show mobile menu button */
   .mobile-menu-button {
     display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 44px !important;
+    height: 44px !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    transition: all 200ms ease-in-out !important;
   }
 }
 
@@ -1393,8 +1463,18 @@ html {
     transform: translateX(-100%);
   }
 
-  /* Show toggle button on desktop, hide close button */
+  /* Show toggle button on desktop when sidebar is open, hide when closed */
   .sidebar-toggle-button {
+    display: flex !important;
+  }
+
+  /* Hide sidebar toggle button when sidebar is closed (it's inside transformed parent) */
+  .admin-sidebar.closed .sidebar-toggle-button {
+    display: none !important;
+  }
+
+  /* Show mobile menu button in header when sidebar is closed on desktop */
+  .sidebar-closed .mobile-menu-button {
     display: flex !important;
   }
 
@@ -1403,8 +1483,37 @@ html {
   }
 
   /* Main content margin is controlled by inline styles in layout.js */
+  main {
+    padding-top: 20px !important;
+    /* Reset padding when header is hidden */
+  }
 
-  /* Hide mobile menu button on desktop */
+  .sidebar-closed main {
+    padding-top: 80px !important;
+    /* Add space for fixed header when it appears */
+  }
+
+  /* Hide header on desktop by default (when sidebar is open) */
+  .mobile-header {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    padding: 16px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    transition: left 300ms ease-in-out !important;
+  }
+
+  /* Show mobile header only when sidebar is closed on desktop */
+  .sidebar-closed .mobile-header {
+    display: block !important;
+  }
+
+
   .mobile-menu-button {
     display: none !important;
   }
