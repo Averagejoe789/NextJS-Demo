@@ -358,6 +358,8 @@ const styles = {
     overflow: 'hidden',
     borderRadius: '0.5rem',
     border: 'none',
+    marginBottom: 0,
+    paddingBottom: 0,
   },
   
   messagesContainer: {
@@ -365,9 +367,11 @@ const styles = {
     overflowY: 'auto',
     overflowX: 'hidden',
     padding: '0.75rem 0.5rem',
+    paddingBottom: '0.75rem',
     scrollBehavior: 'smooth',
     WebkitOverflowScrolling: 'touch',
     backgroundColor: '#f9fafb',
+    marginBottom: 0,
   },
   
   // Welcome Message
@@ -604,10 +608,11 @@ const styles = {
   inputWrapper: {
     borderTop: '1px solid #e5e7eb',
     backgroundColor: '#ffffff',
-    padding: '0.75rem 0.5rem 0.5rem 0.5rem',
+    padding: '0.75rem 0.5rem 0.25rem 0.5rem',
     position: 'sticky',
     bottom: 0,
     zIndex: 10,
+    marginBottom: 0,
   },
   
   inputContainer: {

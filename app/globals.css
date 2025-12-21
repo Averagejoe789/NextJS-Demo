@@ -952,6 +952,8 @@ html {
     background: white !important;
     z-index: 10 !important;
     border-top: 1px solid #e5e7eb !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0 !important;
   }
   
   /* View Toggle - Full width on mobile */
@@ -1104,18 +1106,20 @@ html {
 
   /* Chat interface - full height on mobile (ChatGPT style) */
   .chatgpt-chat-container {
-    height: calc(100vh - 180px) !important;
-    min-height: calc(100vh - 180px) !important;
-    max-height: calc(100vh - 180px) !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
     position: relative !important;
     border-radius: 8px !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .chatgpt-view {
     padding: 0 !important;
     margin: 0 !important;
-    height: calc(100vh - 180px) !important;
-    min-height: calc(100vh - 180px) !important;
+    height: 100% !important;
+    min-height: 100% !important;
     border-radius: 8px !important;
     box-shadow: none !important;
   }
@@ -1125,7 +1129,8 @@ html {
   }
 
   .chatgpt-messages {
-    padding-bottom: 100px !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
   }
 
   .chatgpt-input-wrapper {
@@ -1134,6 +1139,9 @@ html {
     background: white !important;
     z-index: 10 !important;
     border-top: 1px solid #e5e7eb !important;
+    padding: 0.75rem 0.5rem 0.25rem 0.5rem !important;
+    margin: 0 !important;
+    margin-bottom: 0 !important;
   }
 
   /* Hide desktop cart on mobile */
@@ -1144,6 +1152,45 @@ html {
   /* Show floating cart on mobile */
   .mobile-floating-cart {
     display: block !important;
+  }
+
+  /* AI Assistant Page Mobile Styles */
+  .ai-assistant-header {
+    padding: 0.75rem 1rem !important;
+    margin-bottom: 0 !important;
+  }
+
+  .ai-assistant-header .headerContent {
+    gap: 0.75rem !important;
+    flex-wrap: wrap !important;
+  }
+
+  .ai-assistant-content {
+    padding: 0 12px 0 12px !important;
+    margin: 0 auto !important;
+    gap: 0 !important;
+    grid-template-columns: 1fr !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+  }
+
+  .chat-panel {
+    height: calc(100vh - 80px) !important;
+    min-height: calc(100vh - 80px) !important;
+    max-height: calc(100vh - 80px) !important;
+    border-radius: 0.5rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .restaurant-name {
+    font-size: clamp(1rem, 4vw, 1.5rem) !important;
+  }
+
+  .ai-assistant-header .restaurant-logo {
+    width: 48px !important;
+    height: 48px !important;
   }
 }
 
@@ -1181,6 +1228,8 @@ html {
   .chatgpt-input-wrapper {
     position: sticky !important;
     border-radius: 0 0 8px 8px !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0 !important;
   }
 
   .chatgpt-messages {
@@ -1222,6 +1271,47 @@ html {
 
   .cart-title {
     font-size: 18px !important;
+  }
+
+  /* AI Assistant Page - Extra Small Screens */
+  .ai-assistant-header {
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  .ai-assistant-header .headerContent {
+    gap: 0.5rem !important;
+  }
+
+  .ai-assistant-content {
+    padding: 0 8px 0 8px !important;
+    margin: 0 auto !important;
+    gap: 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+  }
+
+  .chat-panel {
+    height: calc(100vh - 70px) !important;
+    min-height: calc(100vh - 70px) !important;
+    max-height: calc(100vh - 70px) !important;
+    border-radius: 0.375rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .restaurant-name {
+    font-size: 0.9375rem !important;
+  }
+
+  .ai-assistant-header .restaurant-logo {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .backButton {
+    padding: 0.375rem 0.75rem !important;
+    font-size: 0.75rem !important;
   }
 }
 

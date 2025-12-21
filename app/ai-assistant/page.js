@@ -1,19 +1,18 @@
 'use client';
 import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { db } from '../../lib/firebase-client';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import MenuDisplay from '../../components/customer/MenuDisplay';
+import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, addDoc, setDoc } from 'firebase/firestore';
+import AIChatInterface from '../../components/customer/AIChatInterface';
 import Cart from '../../components/customer/Cart';
-import FloatingCart from '../../components/customer/FloatingCart';
-import OrderLoading from './loading';
 import Link from 'next/link';
 
 // Force dynamic rendering since we use useSearchParams
 export const dynamic = 'force-dynamic';
 
-function OrderPageContent() {
+function AIAssistantPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const restaurantId = searchParams.get('restaurantId');
   const tableId = searchParams.get('tableId');
 
@@ -21,6 +20,7 @@ function OrderPageContent() {
   const [table, setTable] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
+  const [chatId, setChatId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState('');
@@ -32,17 +32,16 @@ function OrderPageContent() {
       return;
     }
 
-    // Add timeout safety - if initialization takes more than 10 seconds, show error
-    // This prevents the page from being stuck on "Loading..." indefinitely
+    // Add timeout safety
     const timeoutId = setTimeout(() => {
       console.error('⏰ Initialization timeout - taking too long!');
       if (loading) {
         setError('Page is taking too long to load. Please check your internet connection and try again.');
         setLoading(false);
       }
-    }, 10000); // 10 second timeout
+    }, 10000);
 
-    initializeOrder().finally(() => {
+    initializePage().finally(() => {
       clearTimeout(timeoutId);
     });
 
@@ -51,15 +50,13 @@ function OrderPageContent() {
     };
   }, [restaurantId, tableId]);
 
-  const initializeOrder = async () => {
+  const initializePage = async () => {
     setLoading(true);
     setError('');
     
     try {
-      console.log('🔍 Initializing order page...', { restaurantId, tableId });
-      console.log('🔍 Firebase db initialized?', !!db);
+      console.log('🔍 Initializing AI assistant page...', { restaurantId, tableId });
       
-      // Test Firebase connection first
       if (!db) {
         throw new Error('Firebase database not initialized. Please check your Firebase configuration.');
       }
@@ -76,11 +73,10 @@ function OrderPageContent() {
       console.log('✅ Restaurant loaded:', restaurantData.name);
       setRestaurant(restaurantData);
 
-      // Load table info - try by document ID first, then by tableNumber
+      // Load table info
       console.log('🪑 Loading table info...');
       let tableData = null;
       
-      // Try to load by document ID
       const tableRef = doc(db, `restaurants/${restaurantId}/tables/${tableId}`);
       const tableSnap = await getDoc(tableRef);
       
@@ -89,7 +85,6 @@ function OrderPageContent() {
         console.log('✅ Table loaded by ID:', tableData);
         setTable(tableData);
       } else {
-        // If not found by ID, try to find by tableNumber (in case URL uses table number)
         console.log('⚠️ Table not found by ID, searching by tableNumber...');
         const tablesRef = collection(db, `restaurants/${restaurantId}/tables`);
         const tablesSnapshot = await getDocs(tablesRef);
@@ -109,8 +104,8 @@ function OrderPageContent() {
         }
         
         if (!tableData) {
-          console.error('❌ Table not found. Available tables:', tablesSnapshot.docs.map(d => d.data()));
-          throw new Error(`Table not found (${tableId}). Please use a valid table ID or visit /admin/tables to view available tables.`);
+          console.error('❌ Table not found.');
+          throw new Error(`Table not found (${tableId}). Please use a valid table ID.`);
         }
       }
 
@@ -126,47 +121,127 @@ function OrderPageContent() {
       console.log(`✅ Loaded ${availableItems.length} menu items`);
       setMenuItems(availableItems);
 
-      // Note: Chat session creation moved to AI assistant page
+      // Create or get chat session
+      console.log('💬 Creating/finding chat session...');
+      try {
+        const chatSessionId = await getOrCreateChatSession(tableData);
+        if (chatSessionId) {
+          setChatId(chatSessionId);
+          console.log('✅ Chat session ready:', chatSessionId);
+          
+          // Load cart for this chat session
+          await loadCart(chatSessionId);
+        }
+      } catch (chatErr) {
+        console.warn('⚠️ Chat session creation failed (non-critical):', chatErr.message);
+      }
 
-      console.log('✅ Order page initialization complete!');
+      console.log('✅ AI assistant page initialization complete!');
       
     } catch (err) {
-      console.error('❌ Error initializing order:', err);
-      console.error('Error details:', {
-        message: err.message,
-        code: err.code,
-        stack: err.stack
-      });
-      setError(err.message || 'Failed to load order page');
+      console.error('❌ Error initializing AI assistant page:', err);
+      setError(err.message || 'Failed to load AI assistant page');
     } finally {
-      console.log('🏁 Setting loading to false');
       setLoading(false);
     }
   };
 
-  // Load cart from localStorage on mount
-  useEffect(() => {
-    if (restaurantId && tableId) {
-      loadCartFromLocalStorage();
-    }
-  }, [restaurantId, tableId]);
-
-  const loadCartFromLocalStorage = () => {
+  const getOrCreateChatSession = async (tableData) => {
     try {
-      const savedCart = localStorage.getItem(`cart_${restaurantId}_${tableId}`);
-      if (savedCart) {
-        setCart(JSON.parse(savedCart));
+      if (!restaurantId || !tableId) {
+        console.error('Missing restaurantId or tableId');
+        return null;
       }
+
+      const resolvedTableData = tableData || table;
+      if (!resolvedTableData) {
+        console.error('Table data not available for chat session');
+        return null;
+      }
+
+      console.log('Creating/finding chat session for:', { restaurantId, tableId, tableData: resolvedTableData });
+
+      // Check for existing active chat session for this table
+      const chatSessionsRef = collection(db, `restaurants/${restaurantId}/chatSessions`);
+      const existingSessions = await getDocs(chatSessionsRef);
+      
+      let existingChat = null;
+      existingSessions.forEach(doc => {
+        const data = doc.data();
+        const tableIdMatch = data.tableId === tableId || data.tableId === resolvedTableData.id;
+        const tableNumberMatch = data.tableNumber === resolvedTableData.tableNumber;
+        const isActive = data.status === 'active' || !data.status;
+        
+        if ((tableIdMatch || tableNumberMatch) && isActive) {
+          existingChat = { id: doc.id, ...data };
+        }
+      });
+
+      if (existingChat) {
+        console.log('✅ Found existing chat session:', existingChat.id);
+        setChatId(existingChat.id);
+        return existingChat.id;
+      }
+
+      console.log('No existing chat session found, creating new one...');
+
+      // Create new chat session
+      const chatSessionData = {
+        tableId: resolvedTableData.id || tableId,
+        tableNumber: resolvedTableData.tableNumber || 0,
+        status: 'active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      const newChatRef = await addDoc(chatSessionsRef, chatSessionData);
+      console.log('✅ Chat session created successfully:', newChatRef.id);
+
+      setChatId(newChatRef.id);
+      return newChatRef.id;
     } catch (err) {
-      console.error('Error loading cart from localStorage:', err);
+      console.error('❌ Error creating chat session:', err);
+      return null;
     }
   };
 
-  const saveCartToLocalStorage = (cartItems) => {
+  const loadCart = async (sessionId) => {
     try {
-      localStorage.setItem(`cart_${restaurantId}_${tableId}`, JSON.stringify(cartItems));
+      if (!sessionId) return;
+      
+      const cartRef = doc(db, `restaurants/${restaurantId}/chatSessions/${sessionId}/cart`);
+      const cartSnap = await getDoc(cartRef);
+      
+      if (cartSnap.exists()) {
+        const cartData = cartSnap.data();
+        setCart(cartData.items || []);
+      }
+
+      // Listen for cart updates
+      const unsubscribe = onSnapshot(cartRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const cartData = snapshot.data();
+          setCart(cartData.items || []);
+        }
+      });
+
+      return unsubscribe;
     } catch (err) {
-      console.error('Error saving cart to localStorage:', err);
+      console.error('Error loading cart:', err);
+    }
+  };
+
+  const saveCartToFirestore = async (cartItems) => {
+    if (!chatId) return;
+
+    try {
+      const cartRef = doc(db, `restaurants/${restaurantId}/chatSessions/${chatId}/cart`);
+      await setDoc(cartRef, {
+        items: cartItems,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Error saving cart to Firestore:', err);
     }
   };
 
@@ -192,7 +267,7 @@ function OrderPageContent() {
         }];
       }
 
-      saveCartToLocalStorage(updatedCart);
+      saveCartToFirestore(updatedCart);
       return updatedCart;
     });
   };
@@ -204,7 +279,7 @@ function OrderPageContent() {
           ? { ...item, quantity }
           : item
       );
-      saveCartToLocalStorage(updatedCart);
+      saveCartToFirestore(updatedCart);
       return updatedCart;
     });
   };
@@ -212,7 +287,7 @@ function OrderPageContent() {
   const removeFromCart = (menuItemId) => {
     setCart(prevCart => {
       const updatedCart = prevCart.filter(item => item.menuItemId !== menuItemId);
-      saveCartToLocalStorage(updatedCart);
+      saveCartToFirestore(updatedCart);
       return updatedCart;
     });
   };
@@ -236,6 +311,7 @@ function OrderPageContent() {
         body: JSON.stringify({
           restaurantId,
           tableId,
+          chatId,
           items: cart
         })
       });
@@ -254,14 +330,13 @@ function OrderPageContent() {
 
       // Clear cart
       setCart([]);
-      saveCartToLocalStorage([]);
+      saveCartToFirestore([]);
 
       // Show success message
       alert(`Order placed successfully! Order #${result.orderId || 'N/A'}`);
 
     } catch (err) {
       console.error('Error placing order:', err);
-      console.error('Error details:', err.message, err.stack);
       alert(`Failed to place order: ${err.message || 'Please try again.'}`);
     } finally {
       setPlacingOrder(false);
@@ -271,7 +346,7 @@ function OrderPageContent() {
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
-        <div style={styles.loadingText}>Loading order interface...</div>
+        <div style={styles.loadingText}>Loading AI assistant...</div>
       </div>
     );
   }
@@ -286,8 +361,8 @@ function OrderPageContent() {
 
   return (
     <div style={styles.container}>
-      {/* Header - Modern Design */}
-      <div style={styles.header} className="order-header">
+      {/* Header */}
+      <div style={styles.header} className="ai-assistant-header">
         <div style={styles.headerContent}>
           <div style={styles.restaurantInfo}>
             {restaurant?.logoUrl && (
@@ -302,7 +377,7 @@ function OrderPageContent() {
             )}
             <div style={styles.restaurantDetails}>
               <h1 style={styles.restaurantName} className="restaurant-name">
-                {restaurant?.name || 'Restaurant'}
+                {restaurant?.name || 'Restaurant'} - AI Assistant
               </h1>
               {table && (
                 <div style={styles.tableBadge}>
@@ -313,65 +388,74 @@ function OrderPageContent() {
             </div>
           </div>
           <Link 
-            href={`/ai-assistant?restaurantId=${restaurantId}&tableId=${tableId}`}
-            style={styles.aiAssistantButton}
+            href={`/order?restaurantId=${restaurantId}&tableId=${tableId}`}
+            style={styles.backButton}
           >
-            <span style={styles.aiAssistantIcon}>💬</span>
-            <span style={styles.aiAssistantText}>AI Assistant</span>
+            ← Back to Menu
           </Link>
         </div>
       </div>
 
-      <div style={styles.content} className="order-content">
-        <div style={styles.leftPanel} className="order-left-panel">
-          <div style={styles.menuSection} className="menu-section">
-            <MenuDisplay menuItems={menuItems} onAddToCart={addToCart} />
-          </div>
-        </div>
-
-        <div style={styles.rightPanel} className="order-right-panel desktop-cart">
-          <Cart
+      <div style={{
+        ...styles.content,
+        gridTemplateColumns: cart.length > 0 ? '1fr 350px' : '1fr'
+      }} className="ai-assistant-content">
+        <div style={styles.chatPanel} className="chat-panel">
+          <AIChatInterface
+            restaurantId={restaurantId}
+            tableId={tableId}
+            chatId={chatId}
+            menuItems={menuItems}
             cart={cart}
-            onUpdateQuantity={updateCartQuantity}
-            onRemoveItem={removeFromCart}
-            onPlaceOrder={placeOrder}
-            placingOrder={placingOrder}
-          />
-        </div>
-
-        {/* Floating Cart for Mobile */}
-        {/* <div className="mobile-floating-cart">
-          <FloatingCart
-            cart={cart}
-            onUpdateQuantity={updateCartQuantity}
-            onRemoveItem={removeFromCart}
-            onPlaceOrder={placeOrder}
-            placingOrder={placingOrder}
+            onCartUpdate={setCart}
+            onAddToCart={addToCart}
             restaurant={restaurant}
           />
-        </div> */}
+        </div>
+
+        {cart.length > 0 && (
+          <div style={styles.rightPanel} className="desktop-cart">
+            <Cart
+              cart={cart}
+              onUpdateQuantity={updateCartQuantity}
+              onRemoveItem={removeFromCart}
+              onPlaceOrder={placeOrder}
+              placingOrder={placingOrder}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export default function OrderPage() {
+export default function AIAssistantPage() {
   return (
-    <Suspense fallback={<OrderLoading />}>
-      <OrderPageContent />
+    <Suspense fallback={
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingText}>Loading...</div>
+      </div>
+    }>
+      <AIAssistantPageContent />
     </Suspense>
   );
 }
 
 const styles = {
   container: {
-    minHeight: '100vh',
+    height: '100vh',
+    maxHeight: '100vh',
     backgroundColor: '#f9fafb',
-    width: '100vw',
-    maxWidth: '100vw',
+    width: '100%',
+    maxWidth: '100%',
     overflowX: 'hidden',
+    overflowY: 'hidden',
     boxSizing: 'border-box',
     position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    paddingBottom: 0,
+    marginBottom: 0,
   },
   loadingContainer: {
     display: 'flex',
@@ -402,7 +486,7 @@ const styles = {
   header: {
     backgroundColor: '#ffffff',
     borderBottom: '1px solid #e5e7eb',
-    padding: '1rem 1.5rem',
+    padding: '0.75rem 1rem',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
     position: 'sticky',
     top: 0,
@@ -416,15 +500,19 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '0.75rem',
+    flexWrap: 'wrap',
   },
   restaurantInfo: {
     display: 'flex',
     alignItems: 'center',
-    gap: '1rem',
+    gap: '0.75rem',
+    flex: 1,
+    minWidth: 0,
   },
   logoContainer: {
-    width: '56px',
-    height: '56px',
+    width: '48px',
+    height: '48px',
     borderRadius: '0.75rem',
     overflow: 'hidden',
     flexShrink: 0,
@@ -445,7 +533,7 @@ const styles = {
     minWidth: 0,
   },
   restaurantName: {
-    fontSize: '1.5rem',
+    fontSize: 'clamp(1rem, 4vw, 1.5rem)',
     fontWeight: 700,
     margin: 0,
     color: '#111827',
@@ -472,64 +560,51 @@ const styles = {
   tableText: {
     fontSize: '0.875rem',
   },
-  aiAssistantButton: {
-    padding: '0.5rem 1rem',
+  backButton: {
+    padding: '0.5rem 0.875rem',
     backgroundColor: '#0284c7',
     color: '#ffffff',
     borderRadius: '0.5rem',
     textDecoration: 'none',
-    fontSize: '0.875rem',
+    fontSize: '0.8125rem',
     fontWeight: 500,
     transition: 'all 200ms ease-in-out',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
     whiteSpace: 'nowrap',
-    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.3)',
-  },
-  aiAssistantIcon: {
-    fontSize: '1rem',
-  },
-  aiAssistantText: {
-    fontSize: '0.875rem',
+    flexShrink: 0,
   },
   content: {
     maxWidth: '1400px',
-    margin: '20px auto',
-    padding: '0 20px',
+    margin: '0 auto',
+    padding: '0 12px',
     display: 'grid',
-    gridTemplateColumns: '1fr 350px',
-    gap: '20px',
+    gap: '0',
     width: '100%',
     maxWidth: '100%',
     boxSizing: 'border-box',
     overflowX: 'hidden',
-    overflowY: 'visible',
+    overflowY: 'hidden',
+    flex: 1,
+    minHeight: 0,
+    paddingBottom: 0,
+    marginBottom: 0,
+    marginTop: 0,
   },
-  leftPanel: {
+  chatPanel: {
+    backgroundColor: '#ffffff',
+    borderRadius: '0.5rem',
+    padding: '0',
+    boxShadow: 'none',
+    height: '100%',
     display: 'flex',
     flexDirection: 'column',
-    gap: '20px',
-    width: '100%',
-    maxWidth: '100%',
-    minWidth: 0,
-    boxSizing: 'border-box',
     overflow: 'hidden',
+    border: 'none',
+    position: 'relative',
+    minHeight: 0,
+    marginBottom: 0,
   },
   rightPanel: {
     height: 'fit-content'
-  },
-  menuSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: '1rem',
-    padding: '1.5rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    border: '1px solid #e5e7eb',
-    width: '100%',
-    maxWidth: '100%',
-    overflowX: 'hidden',
-    overflowY: 'visible',
-    boxSizing: 'border-box',
   },
 };
 
