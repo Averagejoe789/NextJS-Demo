@@ -3,26 +3,50 @@
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Helper to load .env.local
+function loadEnvLocal() {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const envPath = join(__dirname, '..', '.env.local');
+    const envContent = readFileSync(envPath, 'utf8');
+    const match = envContent.match(/FIREBASE_SERVICE_ACCOUNT='(.+)'/s);
+    if (match) {
+      return match[1];
+    }
+  } catch (error) {
+    // Ignore if file doesn't exist
+  }
+  return null;
+}
 
 // Initialize Firebase Admin
 let db;
 try {
   if (getApps().length === 0) {
-    // Try to use service account from environment
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    // Try to use service account from environment or .env.local
+    let serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    
+    if (!serviceAccountJson) {
+      serviceAccountJson = loadEnvLocal();
+    }
     
     if (serviceAccountJson) {
       const serviceAccount = JSON.parse(serviceAccountJson);
       initializeApp({
         credential: cert(serviceAccount),
-        projectId: serviceAccount.project_id || 'menuai-d0ab5',
-        storageBucket: 'menuai-d0ab5.firebasestorage.app'
+        projectId: serviceAccount.project_id || 'menu-ai-7888e',
+        storageBucket: 'menu-ai-7888e.firebasestorage.app'
       });
     } else {
       // Use default credentials
       initializeApp({
-        projectId: 'menuai-d0ab5',
-        storageBucket: 'menuai-d0ab5.firebasestorage.app'
+        projectId: 'menu-ai-7888e',
+        storageBucket: 'menu-ai-7888e.firebasestorage.app'
       });
     }
   }
@@ -31,7 +55,7 @@ try {
   console.log('✅ Firebase Admin initialized');
 } catch (error) {
   console.error('❌ Error initializing Firebase Admin:', error.message);
-  console.error('Make sure FIREBASE_SERVICE_ACCOUNT environment variable is set');
+  console.error('Make sure FIREBASE_SERVICE_ACCOUNT environment variable is set or .env.local exists');
   process.exit(1);
 }
 

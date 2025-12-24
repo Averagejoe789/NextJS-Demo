@@ -11,20 +11,20 @@ if (!admin.apps.length) {
 			const serviceAccount = JSON.parse(serviceAccountJson);
 			admin.initializeApp({
 				credential: admin.credential.cert(serviceAccount),
-				projectId: serviceAccount.project_id || 'menuai-d0ab5',
+				projectId: serviceAccount.project_id || 'menu-ai-7888e',
 			});
 		} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
 			// Use the path to service account key file
 			admin.initializeApp({
 				credential: admin.credential.applicationDefault(),
-				projectId: 'menuai-d0ab5',
+				projectId: 'menu-ai-7888e',
 			});
 		} else {
 			// Fallback: try to use application default credentials
 			// This will work if gcloud is configured locally
 			admin.initializeApp({
 				credential: admin.credential.applicationDefault(),
-				projectId: 'menuai-d0ab5',
+				projectId: 'menu-ai-7888e',
 			});
 		}
 	} catch (error) {

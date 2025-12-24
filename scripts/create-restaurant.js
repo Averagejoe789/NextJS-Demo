@@ -28,16 +28,16 @@ function initializeFirebase() {
       const serviceAccount = JSON.parse(serviceAccountJson);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id || 'menuai-d0ab5',
-        storageBucket: 'menuai-d0ab5.firebasestorage.app'
+        projectId: serviceAccount.project_id || 'menu-ai-7888e',
+        storageBucket: 'menu-ai-7888e.firebasestorage.app'
       });
       console.log('✅ Firebase Admin initialized from FIREBASE_SERVICE_ACCOUNT');
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       // Use the path to service account key file
       admin.initializeApp({
         credential: admin.credential.applicationDefault(),
-        projectId: 'menuai-d0ab5',
-        storageBucket: 'menuai-d0ab5.firebasestorage.app'
+        projectId: 'menu-ai-7888e',
+        storageBucket: 'menu-ai-7888e.firebasestorage.app'
       });
       console.log('✅ Firebase Admin initialized from GOOGLE_APPLICATION_CREDENTIALS');
     } else {
@@ -47,8 +47,8 @@ function initializeFirebase() {
         const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
-          projectId: serviceAccount.project_id || 'menuai-d0ab5',
-          storageBucket: 'menuai-d0ab5.firebasestorage.app'
+          projectId: serviceAccount.project_id || 'menu-ai-7888e',
+          storageBucket: 'menu-ai-7888e.firebasestorage.app'
         });
         console.log('✅ Firebase Admin initialized from service-account-key.json');
       } catch (fileError) {
