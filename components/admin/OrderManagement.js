@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { getCurrentUser, getRestaurantId } from '../../lib/auth-utils';
 import { formatOrderStatus, getOrderStatusColor, canUpdateOrder } from '../../lib/order-utils';
 
@@ -102,20 +103,6 @@ export default function OrderManagement() {
     }
   };
 
-  const getStatusOptions = (currentStatus) => {
-    const allStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'];
-    const statusFlow = {
-      'pending': ['confirmed', 'cancelled'],
-      'confirmed': ['preparing', 'cancelled'],
-      'preparing': ['ready', 'cancelled'],
-      'ready': ['completed'],
-      'completed': [],
-      'cancelled': []
-    };
-
-    return statusFlow[currentStatus] || [];
-  };
-
   const getOrderStats = () => {
     return {
       total: orders.length,
@@ -195,87 +182,92 @@ export default function OrderManagement() {
         </select>
       </div>
 
-      {/* Orders List */}
-      <div style={styles.ordersList}>
+      {/* Orders Table */}
+      <div style={styles.tableWrapper}>
         {filteredOrders.length === 0 ? (
           <div style={styles.emptyState}>
             <p>No orders found</p>
           </div>
         ) : (
-          filteredOrders.map((order) => (
-            <div key={order.id} style={styles.orderCard}>
-              <div style={styles.orderHeader}>
-                <div>
-                  <h3 style={styles.orderId}>Order #{order.id.slice(0, 8)}</h3>
-                  <p style={styles.orderInfo}>
-                    Table {order.tableNumber} • {order.items?.length || 0} item(s) • ${order.totalAmount?.toFixed(2) || '0.00'}
-                  </p>
-                  <p style={styles.orderTime}>
-                    {order.createdAt ? new Date(order.createdAt).toLocaleString() : 'Unknown time'}
-                  </p>
-                </div>
-                <div style={styles.orderStatus}>
-                  <span
-                    style={{
-                      ...styles.statusBadge,
-                      backgroundColor: getOrderStatusColor(order.status)
+          <table style={styles.table}>
+            <thead>
+              <tr style={styles.tableHeaderRow}>
+                <th style={styles.tableHeader}>Order ID</th>
+                <th style={styles.tableHeader}>Table</th>
+                <th style={styles.tableHeader}>Items</th>
+                <th style={styles.tableHeader}>Total</th>
+                <th style={styles.tableHeader}>Status</th>
+                <th style={styles.tableHeader}>Created At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredOrders.map((order) => {
+                const itemsCount = order.items?.length || 0;
+                const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
+                return (
+                  <tr 
+                    key={order.id} 
+                    style={styles.tableRow}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f8f9fa';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = styles.tableRow.backgroundColor;
                     }}
                   >
-                    {formatOrderStatus(order.status)}
-                  </span>
-                </div>
-              </div>
-
-              {order.items && order.items.length > 0 && (
-                <div style={styles.orderItems}>
-                  {order.items.map((item, index) => (
-                    <div key={index} style={styles.orderItem}>
-                      <span style={styles.itemQuantity}>{item.quantity}x</span>
-                      <span style={styles.itemName}>{item.name}</span>
-                      <span style={styles.itemPrice}>${(item.price * item.quantity).toFixed(2)}</span>
-                      {item.specialInstructions && (
-                        <div style={styles.specialInstructions}>
-                          Note: {item.specialInstructions}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {order.specialInstructions && (
-                <div style={styles.orderNotes}>
-                  <strong>Order Notes:</strong> {order.specialInstructions}
-                </div>
-              )}
-
-              <div style={styles.orderActions}>
-                {getStatusOptions(order.status).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => updateOrderStatus(order.id, status)}
-                    style={{
-                      ...styles.actionButton,
-                      backgroundColor: getOrderStatusColor(status)
-                    }}
-                  >
-                    Mark as {formatOrderStatus(status)}
-                  </button>
-                ))}
-                {order.status === 'ready' && (
-                  <button
-                    onClick={() => updateOrderStatus(order.id, 'completed')}
-                    style={{
-                      ...styles.actionButton,
-                      backgroundColor: getOrderStatusColor('completed')
-                    }}
-                  >
-                    Mark as Completed
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
+                      <td style={styles.tableCell}>
+                        <Link
+                          href={`/admin/orders/${order.id}`}
+                          style={styles.orderIdLink}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.querySelector('span').style.textDecoration = 'underline';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.querySelector('span').style.textDecoration = 'none';
+                          }}
+                        >
+                          <span style={styles.orderIdText}>#{order.id.slice(0, 8)}</span>
+                        </Link>
+                      </td>
+                      <td style={styles.tableCell}>
+                        <span style={styles.tableNumber}>Table {order.tableNumber}</span>
+                      </td>
+                      <td style={styles.tableCell}>
+                        <span style={styles.itemsCount}>{totalItems} item{totalItems !== 1 ? 's' : ''}</span>
+                        <span style={styles.itemsDetail}>({itemsCount} type{itemsCount !== 1 ? 's' : ''})</span>
+                      </td>
+                      <td style={styles.tableCell}>
+                        <span style={styles.totalAmount}>${order.totalAmount?.toFixed(2) || '0.00'}</span>
+                      </td>
+                      <td style={styles.tableCell}>
+                        <span
+                          style={{
+                            ...styles.statusBadge,
+                            backgroundColor: getOrderStatusColor(order.status)
+                          }}
+                        >
+                          {formatOrderStatus(order.status)}
+                        </span>
+                      </td>
+                      <td style={styles.tableCell}>
+                        <span style={styles.createdAt}>
+                          {order.createdAt
+                            ? new Date(order.createdAt).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'Unknown'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
@@ -369,42 +361,70 @@ const styles = {
     fontSize: '14px',
     outline: 'none',
   },
-  ordersList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-  },
-  orderCard: {
-    border: '1px solid #e0e0e0',
+  tableWrapper: {
+    overflowX: 'auto',
     borderRadius: '8px',
-    padding: '20px',
+    border: '1px solid #e0e0e0',
     backgroundColor: '#fff',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
   },
-  orderHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '16px',
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    backgroundColor: '#fff',
   },
-  orderId: {
-    fontSize: '18px',
+  tableHeaderRow: {
+    backgroundColor: '#f8f9fa',
+    borderBottom: '2px solid #e0e0e0',
+  },
+  tableHeader: {
+    padding: '16px',
+    textAlign: 'left',
+    fontSize: '14px',
     fontWeight: '600',
-    marginBottom: '4px',
+    color: '#333',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  },
+  tableRow: {
+    borderBottom: '1px solid #e0e0e0',
+    backgroundColor: '#fff',
+    transition: 'background-color 0.2s ease',
+  },
+  tableCell: {
+    padding: '16px',
+    fontSize: '14px',
+    color: '#333',
+    verticalAlign: 'middle',
+  },
+  orderIdLink: {
+    textDecoration: 'none',
+    cursor: 'pointer',
+    display: 'inline-block',
+  },
+  orderIdText: {
+    fontWeight: '600',
+    color: '#007bff',
+    fontFamily: 'monospace',
+    transition: 'color 0.2s ease',
+  },
+  tableNumber: {
+    fontWeight: '500',
     color: '#333',
   },
-  orderInfo: {
-    fontSize: '14px',
-    color: '#666',
-    marginBottom: '4px',
+  itemsCount: {
+    fontWeight: '500',
+    color: '#333',
+    display: 'block',
   },
-  orderTime: {
+  itemsDetail: {
     fontSize: '12px',
-    color: '#999',
+    color: '#666',
+    display: 'block',
   },
-  orderStatus: {
-    display: 'flex',
-    alignItems: 'center',
+  totalAmount: {
+    fontWeight: '600',
+    color: '#28a745',
+    fontSize: '16px',
   },
   statusBadge: {
     padding: '6px 12px',
@@ -413,65 +433,11 @@ const styles = {
     fontWeight: '500',
     color: 'white',
     textTransform: 'capitalize',
+    display: 'inline-block',
   },
-  orderItems: {
-    marginBottom: '16px',
-    padding: '12px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '4px',
-  },
-  orderItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    marginBottom: '8px',
-    fontSize: '14px',
-  },
-  itemQuantity: {
-    fontWeight: '600',
-    color: '#007bff',
-    minWidth: '30px',
-  },
-  itemName: {
-    flex: 1,
-    color: '#333',
-  },
-  itemPrice: {
-    fontWeight: '600',
-    color: '#28a745',
-    minWidth: '80px',
-    textAlign: 'right',
-  },
-  specialInstructions: {
-    fontSize: '12px',
+  createdAt: {
+    fontSize: '13px',
     color: '#666',
-    fontStyle: 'italic',
-    marginLeft: '42px',
-    marginTop: '-4px',
-    marginBottom: '4px',
-  },
-  orderNotes: {
-    padding: '12px',
-    backgroundColor: '#fff3cd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    color: '#856404',
-    marginBottom: '16px',
-  },
-  orderActions: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap',
-  },
-  actionButton: {
-    padding: '8px 16px',
-    border: 'none',
-    borderRadius: '4px',
-    color: 'white',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'opacity 0.2s',
   },
   emptyState: {
     textAlign: 'center',

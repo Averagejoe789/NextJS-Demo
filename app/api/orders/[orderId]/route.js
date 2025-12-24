@@ -25,7 +25,7 @@ export async function PATCH(request, { params }) {
 
     const orderSnap = await orderRef.get();
 
-    if (!orderSnap.exists()) {
+    if (!orderSnap.exists) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
@@ -130,7 +130,7 @@ export async function GET(request, { params }) {
 
     const orderSnap = await orderRef.get();
 
-    if (!orderSnap.exists()) {
+    if (!orderSnap.exists) {
       return NextResponse.json(
         { error: 'Order not found' },
         { status: 404 }
