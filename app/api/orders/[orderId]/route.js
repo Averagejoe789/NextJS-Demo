@@ -248,12 +248,15 @@ export async function GET(request, { params }) {
       name: error.name,
       code: error.code
     });
-    // Return error details in production for debugging
+    // Return detailed error in production for debugging
     return NextResponse.json(
       { 
         error: 'Failed to fetch order', 
         details: error.message,
-        code: error.code || 'UNKNOWN_ERROR'
+        code: error.code || 'UNKNOWN_ERROR',
+        name: error.name || 'Error',
+        // Include stack in development
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
       },
       { status: 500 }
     );
