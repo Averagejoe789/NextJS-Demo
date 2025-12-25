@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "eslint": "^8",
-    "eslint-config-next": "14.x.x"
+    "eslint-config-next": "14.x.x",
+    "vercel": "^50.1.3"
   }
 }
