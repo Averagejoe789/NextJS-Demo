@@ -5,7 +5,7 @@ import { canUpdateOrder } from '../../../../lib/order-utils';
 
 export async function PATCH(request, { params }) {
   try {
-    const { orderId } = params;
+    const { orderId } = await params;
     const body = await request.json();
     const { restaurantId, status, notes } = body;
 
@@ -111,7 +111,7 @@ export async function PATCH(request, { params }) {
 
 export async function GET(request, { params }) {
   try {
-    const { orderId } = params;
+    const { orderId } = await params;
     const { searchParams } = new URL(request.url);
     const restaurantId = searchParams.get('restaurantId');
 
