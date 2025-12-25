@@ -139,14 +139,6 @@ export async function GET(request, { params }) {
       throw new Error('Firebase Admin not initialized');
     }
 
-    // Test if adminDb is actually usable
-    try {
-      await adminDb.collection('test').limit(1).get();
-    } catch (testError) {
-      console.error('Firebase Admin connection test failed:', testError);
-      // Continue anyway - might be a permissions issue, not initialization
-    }
-
     console.log('Querying Firestore for order:', orderId);
     const orderRef = adminDb
       .collection('restaurants')
