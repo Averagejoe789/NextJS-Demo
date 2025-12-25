@@ -182,21 +182,47 @@ export async function GET(request, { params }) {
       console.error('Error converting updatedAt:', err);
     }
 
+    // Safely serialize items array
+    let items = [];
+    try {
+      if (Array.isArray(orderData.items)) {
+        items = orderData.items.map(item => ({
+          menuItemId: item.menuItemId || null,
+          name: item.name || '',
+          price: typeof item.price === 'number' ? item.price : 0,
+          quantity: typeof item.quantity === 'number' ? item.quantity : 0,
+          specialInstructions: item.specialInstructions || null,
+          imageUrl: item.imageUrl || null
+        }));
+      }
+    } catch (err) {
+      console.error('Error serializing items:', err);
+      items = [];
+    }
+
     // Build order object manually to avoid serialization issues with Firestore objects
     const order = {
       id: orderSnap.id,
       restaurantId: orderData.restaurantId || null,
       tableId: orderData.tableId || null,
-      tableNumber: orderData.tableNumber || null,
+      tableNumber: typeof orderData.tableNumber === 'number' ? orderData.tableNumber : null,
       chatId: orderData.chatId || null,
-      items: orderData.items || [],
-      totalAmount: orderData.totalAmount || 0,
+      items: items,
+      totalAmount: typeof orderData.totalAmount === 'number' ? orderData.totalAmount : 0,
       status: orderData.status || 'pending',
       specialInstructions: orderData.specialInstructions || null,
       notes: orderData.notes || null,
       createdAt,
       updatedAt
     };
+
+    // Test serialization before returning
+    try {
+      JSON.stringify(order);
+    } catch (serializationError) {
+      console.error('Serialization error:', serializationError);
+      throw new Error(`Failed to serialize order: ${serializationError.message}`);
+    }
 
     return NextResponse.json({
       success: true,
