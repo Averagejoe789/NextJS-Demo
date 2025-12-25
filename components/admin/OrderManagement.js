@@ -1,10 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { getCurrentUser, getRestaurantId } from '../../lib/auth-utils';
 import { formatOrderStatus, getOrderStatusColor, canUpdateOrder } from '../../lib/order-utils';
 
 export default function OrderManagement() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
@@ -209,6 +211,7 @@ export default function OrderManagement() {
                   <tr 
                     key={order.id} 
                     style={styles.tableRow}
+                    onClick={() => router.push(`/admin/orders/${order.id}`)}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = '#f8f9fa';
                     }}
@@ -220,6 +223,7 @@ export default function OrderManagement() {
                         <Link
                           href={`/admin/orders/${order.id}`}
                           style={styles.orderIdLink}
+                          onClick={(e) => e.stopPropagation()}
                           onMouseEnter={(e) => {
                             e.currentTarget.querySelector('span').style.textDecoration = 'underline';
                           }}
@@ -389,6 +393,7 @@ const styles = {
     borderBottom: '1px solid #e0e0e0',
     backgroundColor: '#fff',
     transition: 'background-color 0.2s ease',
+    cursor: 'pointer',
   },
   tableCell: {
     padding: '16px',
