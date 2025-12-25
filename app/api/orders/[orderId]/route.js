@@ -153,6 +153,13 @@ export async function GET(request, { params }) {
 
     const orderData = orderSnap.data();
     
+    if (!orderData) {
+      return NextResponse.json(
+        { error: 'Order data is empty' },
+        { status: 404 }
+      );
+    }
+    
     // Safely convert Firestore timestamps to ISO strings
     let createdAt = null;
     let updatedAt = null;
@@ -175,9 +182,18 @@ export async function GET(request, { params }) {
       console.error('Error converting updatedAt:', err);
     }
 
+    // Build order object manually to avoid serialization issues with Firestore objects
     const order = {
       id: orderSnap.id,
-      ...orderData,
+      restaurantId: orderData.restaurantId || null,
+      tableId: orderData.tableId || null,
+      tableNumber: orderData.tableNumber || null,
+      chatId: orderData.chatId || null,
+      items: orderData.items || [],
+      totalAmount: orderData.totalAmount || 0,
+      status: orderData.status || 'pending',
+      specialInstructions: orderData.specialInstructions || null,
+      notes: orderData.notes || null,
       createdAt,
       updatedAt
     };
@@ -195,10 +211,12 @@ export async function GET(request, { params }) {
       name: error.name,
       code: error.code
     });
+    // Return error details in production for debugging
     return NextResponse.json(
       { 
         error: 'Failed to fetch order', 
-        details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        details: error.message,
+        code: error.code || 'UNKNOWN_ERROR'
       },
       { status: 500 }
     );
