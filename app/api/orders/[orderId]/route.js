@@ -124,6 +124,8 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url);
     const restaurantId = searchParams.get('restaurantId');
 
+    console.log('Fetching order:', { orderId, restaurantId });
+
     if (!restaurantId || !orderId) {
       return NextResponse.json(
         { error: 'restaurantId and orderId are required' },
@@ -133,16 +135,33 @@ export async function GET(request, { params }) {
 
     // Ensure adminDb is initialized
     if (!adminDb) {
+      console.error('adminDb is not initialized');
       throw new Error('Firebase Admin not initialized');
     }
 
+    // Test if adminDb is actually usable
+    try {
+      await adminDb.collection('test').limit(1).get();
+    } catch (testError) {
+      console.error('Firebase Admin connection test failed:', testError);
+      // Continue anyway - might be a permissions issue, not initialization
+    }
+
+    console.log('Querying Firestore for order:', orderId);
     const orderRef = adminDb
       .collection('restaurants')
       .doc(restaurantId)
       .collection('orders')
       .doc(orderId);
 
-    const orderSnap = await orderRef.get();
+    let orderSnap;
+    try {
+      orderSnap = await orderRef.get();
+      console.log('Order snapshot retrieved:', orderSnap.exists);
+    } catch (firestoreError) {
+      console.error('Firestore query error:', firestoreError);
+      throw new Error(`Firestore error: ${firestoreError.message}`);
+    }
 
     if (!orderSnap.exists) {
       return NextResponse.json(
