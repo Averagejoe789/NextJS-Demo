@@ -192,7 +192,18 @@ export default function BranchDetail({ branchId }) {
       };
 
       const tablesRef = collection(db, `restaurants/${restaurantId}/tables`);
-      await addDoc(tablesRef, tableData);
+      const docRef = await addDoc(tablesRef, tableData);
+      const tableId = docRef.id;
+
+      // Generate chat URL
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const chatUrl = `${baseUrl}/order?restaurantId=${restaurantId}&tableId=${tableId}`;
+
+      // Update table with chat URL
+      const tableDocRef = doc(db, `restaurants/${restaurantId}/tables`, tableId);
+      await updateDoc(tableDocRef, {
+        chatUrl: chatUrl
+      });
 
       setNewTableNumber('');
       setNewTableSection('');
@@ -345,6 +356,27 @@ export default function BranchDetail({ branchId }) {
                   <span style={styles.tableMeta}>
                     Section: -- Priority: {table.priority || 0}
                   </span>
+                  {table.chatUrl && (
+                    <div style={styles.chatUrlContainer}>
+                      <input
+                        type="text"
+                        value={table.chatUrl}
+                        readOnly
+                        style={styles.chatUrlInput}
+                        onClick={(e) => e.target.select()}
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(table.chatUrl);
+                          alert('Chat URL copied to clipboard!');
+                        }}
+                        style={styles.copyButton}
+                        title="Copy chat URL"
+                      >
+                        📋
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={() => handleDeleteTable(table.id)}
                     style={styles.deleteTableButton}
@@ -672,6 +704,8 @@ const styles = {
     borderRadius: designSystem.borderRadius.md,
     boxShadow: designSystem.shadows.base,
     border: `1px solid ${designSystem.colors.border}`,
+    gap: designSystem.spacing[4],
+    flexWrap: 'wrap',
   },
   tableRecordLeft: {
     display: 'flex',
@@ -696,11 +730,43 @@ const styles = {
   tableRecordRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: designSystem.spacing[4],
+    gap: designSystem.spacing[3],
+    flexWrap: 'wrap',
   },
   tableMeta: {
     fontSize: designSystem.typography.fontSize.sm,
     color: designSystem.colors.text.secondary,
+  },
+  chatUrlContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: designSystem.spacing[2],
+    maxWidth: '400px',
+  },
+  chatUrlInput: {
+    flex: 1,
+    padding: `${designSystem.spacing[2]} ${designSystem.spacing[3]}`,
+    border: `1px solid ${designSystem.colors.border}`,
+    borderRadius: designSystem.borderRadius.md,
+    fontSize: designSystem.typography.fontSize.sm,
+    fontFamily: 'monospace',
+    backgroundColor: designSystem.colors.gray[50],
+    color: designSystem.colors.text.primary,
+    minWidth: '200px',
+    outline: 'none',
+  },
+  copyButton: {
+    padding: `${designSystem.spacing[2]} ${designSystem.spacing[3]}`,
+    backgroundColor: designSystem.colors.primary[600],
+    color: designSystem.colors.text.inverse,
+    border: 'none',
+    borderRadius: designSystem.borderRadius.md,
+    fontSize: designSystem.typography.fontSize.sm,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: designSystem.transitions.base,
   },
   deleteTableButton: {
     background: 'none',
