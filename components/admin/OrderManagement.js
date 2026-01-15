@@ -14,12 +14,14 @@ export default function OrderManagement() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [buttonHovered, setButtonHovered] = useState(false);
 
   useEffect(() => {
     loadOrders();
     
-    // Refresh orders every 5 seconds
-    const interval = setInterval(loadOrders, 5000);
+    // Refresh orders every 1 minute
+    const interval = setInterval(loadOrders, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -27,12 +29,17 @@ export default function OrderManagement() {
     filterOrders();
   }, [orders, selectedStatus]);
 
-  const loadOrders = async () => {
+  const loadOrders = async (showRefreshing = false) => {
     try {
+      if (showRefreshing) {
+        setRefreshing(true);
+      }
+      
       const restaurantId = getRestaurantId();
       if (!restaurantId) {
         setError('Restaurant ID not found');
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -45,11 +52,17 @@ export default function OrderManagement() {
 
       setOrders(result.orders || []);
       setLoading(false);
+      setRefreshing(false);
     } catch (err) {
       console.error('Error loading orders:', err);
       setError(err.message || 'Failed to load orders');
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleManualRefresh = () => {
+    loadOrders(true);
   };
 
   const filterOrders = () => {
@@ -166,7 +179,7 @@ export default function OrderManagement() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters and Refresh Button */}
       <div style={styles.filters}>
         <label style={styles.filterLabel}>Filter by Status:</label>
         <select
@@ -182,6 +195,31 @@ export default function OrderManagement() {
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
+        <button
+          onClick={handleManualRefresh}
+          disabled={refreshing || loading}
+          onMouseEnter={() => !refreshing && !loading && setButtonHovered(true)}
+          onMouseLeave={() => setButtonHovered(false)}
+          style={{
+            ...styles.refreshButton,
+            opacity: (refreshing || loading) ? 0.6 : 1,
+            cursor: (refreshing || loading) ? 'not-allowed' : 'pointer',
+            backgroundColor: buttonHovered && !refreshing && !loading ? '#0056b3' : '#007bff',
+            transition: 'background-color 0.2s ease'
+          }}
+        >
+          {refreshing ? (
+            <>
+              <span style={{ ...styles.refreshIcon, animation: 'spin 1s linear infinite' }}>⟳</span>
+              Refreshing...
+            </>
+          ) : (
+            <>
+              <span style={styles.refreshIcon}>⟳</span>
+              Refresh
+            </>
+          )}
+        </button>
       </div>
 
       {/* Orders Table */}
@@ -364,6 +402,26 @@ const styles = {
     borderRadius: '4px',
     fontSize: '14px',
     outline: 'none',
+  },
+  refreshButton: {
+    marginLeft: 'auto',
+    padding: '8px 16px',
+    backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'background-color 0.2s ease, opacity 0.2s ease',
+  },
+  refreshIcon: {
+    fontSize: '16px',
+    display: 'inline-block',
+    animation: 'none',
   },
   tableWrapper: {
     overflowX: 'auto',

@@ -12,7 +12,20 @@ export async function PATCH(request, { params }) {
     
     // Ensure adminDb is initialized
     if (!adminDb) {
-      throw new Error('Firebase Admin not initialized');
+      console.error('adminDb is not initialized - Firebase Admin credentials not configured');
+      return NextResponse.json(
+        {
+          error: 'Firebase Admin not initialized',
+          details: 'Firebase Admin credentials are not configured. Please configure one of the following:\n' +
+            '1. Set FIREBASE_SERVICE_ACCOUNT environment variable with your service account JSON\n' +
+            '2. Set GOOGLE_APPLICATION_CREDENTIALS environment variable pointing to your service account key file\n' +
+            '3. Place service-account-key.json file in the project root\n' +
+            '4. Configure Google Cloud SDK with application default credentials\n' +
+            'See FIREBASE_SETUP.md for detailed instructions.',
+          code: 'FIREBASE_ADMIN_NOT_INITIALIZED'
+        },
+        { status: 500 }
+      );
     }
     const { restaurantId, status, notes } = body;
 
@@ -135,8 +148,20 @@ export async function GET(request, { params }) {
 
     // Ensure adminDb is initialized
     if (!adminDb) {
-      console.error('adminDb is not initialized');
-      throw new Error('Firebase Admin not initialized');
+      console.error('adminDb is not initialized - Firebase Admin credentials not configured');
+      return NextResponse.json(
+        {
+          error: 'Firebase Admin not initialized',
+          details: 'Firebase Admin credentials are not configured. Please configure one of the following:\n' +
+            '1. Set FIREBASE_SERVICE_ACCOUNT environment variable with your service account JSON\n' +
+            '2. Set GOOGLE_APPLICATION_CREDENTIALS environment variable pointing to your service account key file\n' +
+            '3. Place service-account-key.json file in the project root\n' +
+            '4. Configure Google Cloud SDK with application default credentials\n' +
+            'See FIREBASE_SETUP.md for detailed instructions.',
+          code: 'FIREBASE_ADMIN_NOT_INITIALIZED'
+        },
+        { status: 500 }
+      );
     }
 
     console.log('Querying Firestore for order:', orderId);
@@ -152,6 +177,26 @@ export async function GET(request, { params }) {
       console.log('Order snapshot retrieved:', orderSnap.exists);
     } catch (firestoreError) {
       console.error('Firestore query error:', firestoreError);
+      
+      // Check if this is a credentials error
+      if (firestoreError.message && firestoreError.message.includes('Could not load the default credentials')) {
+        return NextResponse.json(
+          {
+            error: 'Firebase Admin credentials not configured',
+            details: 'Firebase Admin credentials are invalid or not configured. The application tried to use default credentials but they are not available.\n\n' +
+              'Please configure one of the following:\n' +
+              '1. Set FIREBASE_SERVICE_ACCOUNT environment variable with your service account JSON\n' +
+              '2. Set GOOGLE_APPLICATION_CREDENTIALS environment variable pointing to your service account key file\n' +
+              '3. Place service-account-key.json file in the project root\n' +
+              '4. Configure Google Cloud SDK with application default credentials\n\n' +
+              'See FIREBASE_SETUP.md for detailed instructions.',
+            code: 'FIREBASE_CREDENTIALS_INVALID'
+          },
+          { status: 500 }
+        );
+      }
+      
+      // Generic Firestore error
       throw new Error(`Firestore error: ${firestoreError.message}`);
     }
 
