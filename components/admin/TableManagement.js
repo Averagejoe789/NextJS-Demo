@@ -1,637 +1,670 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { db, storage } from '../../lib/firebase-client';
-import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getCurrentUser, getRestaurantId } from '../../lib/auth-utils';
-import QRCode from 'qrcode';
+import { useRouter } from 'next/navigation';
+import { db } from '../../lib/firebase-client';
+import { collection, getDocs, addDoc, query, orderBy } from 'firebase/firestore';
+import { getRestaurantId } from '../../lib/auth-utils';
+import { designSystem } from '../../lib/design-system';
 
 export default function TableManagement() {
+  const router = useRouter();
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [tables, setTables] = useState([]);
-  const [tableCount, setTableCount] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [branchName, setBranchName] = useState('');
+  const [location, setLocation] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [selectedBranches, setSelectedBranches] = useState(new Set());
+  const [sortColumn, setSortColumn] = useState('name');
+  const [sortDirection, setSortDirection] = useState('desc');
 
   useEffect(() => {
-    loadTables();
+    loadBranches();
   }, []);
 
-  const loadTables = async () => {
+  const loadBranches = async () => {
     try {
+      setLoading(true);
       const restaurantId = getRestaurantId();
       if (!restaurantId) {
-        setError('Restaurant ID not found');
-        setLoading(false);
-        return;
+        throw new Error('Restaurant ID not found');
       }
 
-      const tablesRef = collection(db, `restaurants/${restaurantId}/tables`);
-      const q = query(tablesRef, orderBy('tableNumber', 'asc'));
+      const branchesRef = collection(db, `restaurants/${restaurantId}/branches`);
+      const q = query(branchesRef, orderBy('branchName', 'asc'));
       const snapshot = await getDocs(q);
       
-      const tablesList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const branchesList = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+          const branchData = doc.data();
+          // Count tables for this branch
+          const tablesRef = collection(db, `restaurants/${restaurantId}/tables`);
+          const tablesSnapshot = await getDocs(tablesRef);
+          const tablesCount = tablesSnapshot.docs.filter(
+            tableDoc => tableDoc.data().branchId === doc.id
+          ).length;
+
+          return {
+            id: doc.id,
+            ...branchData,
+            tablesCount
+          };
+        })
+      );
       
-      setTables(tablesList);
-      setLoading(false);
+      setBranches(branchesList);
     } catch (err) {
-      console.error('Error loading tables:', err);
-      setError('Failed to load tables');
-      setLoading(false);
-    }
-  };
-
-  const generateQRCode = async (restaurantId, tableId, tableNumber) => {
-    const baseUrl = window.location.origin;
-    const url = `${baseUrl}/order?restaurantId=${restaurantId}&tableId=${tableId}`;
-    
-    try {
-      // Generate QR code data URL
-      const qrDataURL = await QRCode.toDataURL(url, {
-        width: 400,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      });
-
-      // Convert data URL to blob
-      const response = await fetch(qrDataURL);
-      const blob = await response.blob();
-
-      // Upload to Firebase Storage
-      const user = getCurrentUser();
-      const storageRef = ref(storage, `restaurants/${restaurantId}/qr-codes/table-${tableNumber}-${tableId}.png`);
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      return {
-        qrCodeUrl: downloadURL,
-        qrCodeData: url,
-        dataURL: qrDataURL
-      };
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      throw new Error('Failed to generate QR code');
-    }
-  };
-
-  const createTables = async () => {
-    if (!tableCount || isNaN(tableCount) || parseInt(tableCount) <= 0) {
-      setError('Please enter a valid number of tables');
-      return;
-    }
-
-    setError('');
-    setSuccess('');
-    setSaving(true);
-
-    try {
-      const restaurantId = getRestaurantId();
-      if (!restaurantId) {
-        throw new Error('Restaurant ID not found');
-      }
-
-      const count = parseInt(tableCount);
-      const baseUrl = window.location.origin;
-      const newTables = [];
-
-      // Create tables
-      for (let i = 1; i <= count; i++) {
-        // Check if table number already exists
-        const existingTable = tables.find(t => t.tableNumber === i);
-        if (existingTable) {
-          continue; // Skip if table already exists
-        }
-
-        const tableData = {
-          tableNumber: i,
-          status: 'available',
-          createdAt: new Date().toISOString()
-        };
-
-        // Create table document
-        const tableRef = collection(db, `restaurants/${restaurantId}/tables`);
-        const docRef = await addDoc(tableRef, tableData);
-        const tableId = docRef.id;
-
-        // Generate QR code
-        const qrData = await generateQRCode(restaurantId, tableId, i);
-
-        // Update table with QR code data
-        const tableDocRef = doc(db, `restaurants/${restaurantId}/tables`, tableId);
-        await updateDoc(tableDocRef, {
-          qrCodeUrl: qrData.qrCodeUrl,
-          qrCodeData: qrData.qrCodeData
-        });
-
-        newTables.push({
-          id: tableId,
-          ...tableData,
-          ...qrData
-        });
-      }
-
-      setSuccess(`Successfully created ${newTables.length} table(s)!`);
-      setTableCount('');
-      await loadTables();
-    } catch (err) {
-      console.error('Error creating tables:', err);
-      setError(err.message || 'Failed to create tables');
+      console.error('Error loading branches:', err);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const deleteTable = async (tableId) => {
-    if (!confirm('Are you sure you want to delete this table? This cannot be undone.')) {
+  const createBranch = async () => {
+    if (!branchName.trim()) {
+      alert('Please enter a branch name');
       return;
     }
 
+    if (!location.trim()) {
+      alert('Please enter a location');
+      return;
+    }
+
+    setCreating(true);
     try {
       const restaurantId = getRestaurantId();
       if (!restaurantId) {
         throw new Error('Restaurant ID not found');
       }
 
-      await deleteDoc(doc(db, `restaurants/${restaurantId}/tables`, tableId));
-      setSuccess('Table deleted successfully');
-      await loadTables();
+      const branchData = {
+        branchName: branchName.trim(),
+        location: location.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      const branchesRef = collection(db, `restaurants/${restaurantId}/branches`);
+      await addDoc(branchesRef, branchData);
+
+      setBranchName('');
+      setLocation('');
+      setShowCreateModal(false);
+      await loadBranches();
     } catch (err) {
-      console.error('Error deleting table:', err);
-      setError(err.message || 'Failed to delete table');
+      console.error('Error creating branch:', err);
+      alert(err.message || 'Failed to create branch');
+    } finally {
+      setCreating(false);
     }
   };
 
-  const downloadQRCode = (qrCodeUrl, tableNumber) => {
-    const link = document.createElement('a');
-    link.href = qrCodeUrl;
-    link.download = `table-${tableNumber}-qr-code.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
   };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedBranches(new Set(branches.map(b => b.id)));
+    } else {
+      setSelectedBranches(new Set());
+    }
+  };
+
+  const handleSelectBranch = (branchId) => {
+    const newSelected = new Set(selectedBranches);
+    if (newSelected.has(branchId)) {
+      newSelected.delete(branchId);
+    } else {
+      newSelected.add(branchId);
+    }
+    setSelectedBranches(newSelected);
+  };
+
+  const handleEdit = (branch) => {
+    router.push(`/admin/tables/${branch.id}`);
+  };
+
+  const handleCopy = (branch) => {
+    // TODO: Implement copy functionality
+    console.log('Copy branch:', branch);
+  };
+
+  const sortedBranches = [...branches].sort((a, b) => {
+    let aVal, bVal;
+    if (sortColumn === 'name') {
+      aVal = a.branchName?.toLowerCase() || '';
+      bVal = b.branchName?.toLowerCase() || '';
+    } else if (sortColumn === 'location') {
+      aVal = a.location?.toLowerCase() || '';
+      bVal = b.location?.toLowerCase() || '';
+    } else {
+      aVal = a.tablesCount || 0;
+      bVal = b.tablesCount || 0;
+    }
+
+    if (sortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
 
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
-        <div style={styles.loadingText}>Loading tables...</div>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: `4px solid ${designSystem.colors.gray[200]}`,
+          borderTop: `4px solid ${designSystem.colors.primary[600]}`,
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+        }}></div>
+        <p style={styles.loadingText}>Loading dining areas...</p>
       </div>
     );
   }
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Table Management</h1>
-      <p style={styles.subtitle}>Configure tables and generate QR codes for customer ordering</p>
-
-      {error && (
-        <div style={styles.errorBox}>
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div style={styles.successBox}>
-          {success}
-        </div>
-      )}
-
-      <div style={styles.createSection}>
-        <h2 style={styles.sectionTitle}>Create New Tables</h2>
-        <div style={styles.inputGroup}>
-          <label style={styles.label}>Number of Tables:</label>
-          <input
-            type="number"
-            value={tableCount}
-            onChange={(e) => setTableCount(e.target.value)}
-            min="1"
-            placeholder="e.g., 10"
-            style={styles.input}
-          />
-          <button 
-            onClick={createTables} 
-            disabled={saving}
-            style={styles.button}
-          >
-            {saving ? 'Creating...' : 'Create Tables'}
-          </button>
-        </div>
-        <p style={styles.helpText}>
-          Enter the number of tables to create. Each table will get a unique QR code.
-        </p>
+      {/* Header */}
+      <div style={styles.header}>
+        <h1 style={styles.title}>Dining Areas</h1>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          style={styles.newButton}
+        >
+          <span style={styles.plusIcon}>+</span>
+          New
+        </button>
       </div>
 
-      <div style={styles.tablesSection}>
-        <h2 style={styles.sectionTitle}>Existing Tables ({tables.length})</h2>
-        {tables.length === 0 ? (
-          <div style={styles.emptyState}>
-            <p>No tables created yet. Create tables above to get started.</p>
-          </div>
-        ) : (
-          <div style={styles.tablesGrid}>
-            {tables.map((table) => (
-              <div key={table.id} style={styles.tableCard} className="table-card">
-                <div style={styles.tableHeader}>
-                  <h3 style={styles.tableNumber}>Table {table.tableNumber}</h3>
-                  <span style={{
-                    ...styles.statusBadge,
-                    backgroundColor: table.status === 'available' ? '#28a745' : 
-                                   table.status === 'occupied' ? '#ffc107' : '#6c757d'
-                  }}>
-                    {table.status}
+      {/* Table View */}
+      <div style={styles.tableCard}>
+        <table style={styles.table}>
+          <thead>
+            <tr style={styles.tableHeaderRow}>
+              <th style={styles.checkboxHeader}>
+                <input
+                  type="checkbox"
+                  checked={selectedBranches.size === branches.length && branches.length > 0}
+                  onChange={handleSelectAll}
+                  style={styles.checkbox}
+                />
+              </th>
+              <th style={styles.actionHeader}></th>
+              <th 
+                style={styles.tableHeader}
+                onClick={() => handleSort('name')}
+              >
+                <div style={styles.headerContent}>
+                  Name
+                  <span style={styles.sortIcon}>
+                    {sortColumn === 'name' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
                   </span>
                 </div>
-                
-                {table.qrCodeUrl && (
-                  <div style={styles.qrSection}>
-                    <img src={table.qrCodeUrl} alt={`Table ${table.tableNumber} QR Code`} style={styles.qrImage} />
-                    <div style={styles.qrActions}>
-                      <button
-                        onClick={() => downloadQRCode(table.qrCodeUrl, table.tableNumber)}
-                        style={styles.downloadButton}
-                        className="download-button"
-                      >
-                        Download QR Code
-                      </button>
-                      <button
-                        onClick={() => window.open(table.qrCodeUrl, '_blank')}
-                        style={styles.viewButton}
-                        className="view-button"
-                      >
-                        View Full Size
-                      </button>
-                    </div>
+              </th>
+              <th 
+                style={styles.tableHeader}
+                onClick={() => handleSort('location')}
+              >
+                <div style={styles.headerContent}>
+                  Location(s)
+                  <span style={styles.sortIcon}>
+                    {sortColumn === 'location' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                  </span>
+                </div>
+              </th>
+              <th style={styles.tableHeader}>
+                <div style={styles.headerContent}>
+                  Tables
+                  <span style={styles.filterIcon}>⚙</span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedBranches.length === 0 ? (
+              <tr>
+                <td colSpan="5" style={styles.emptyCell}>
+                  <div style={styles.emptyState}>
+                    <div style={styles.emptyIcon}>🏢</div>
+                    <h3 style={styles.emptyTitle}>No dining areas yet</h3>
+                    <p style={styles.emptyText}>Create your first branch to get started</p>
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      style={styles.emptyButton}
+                    >
+                      Create Branch
+                    </button>
                   </div>
-                )}
-                
-                {(() => {
-                  const restaurantId = getRestaurantId();
-                  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-                  const tableLink = table.qrCodeData || (baseUrl ? `${baseUrl}/order?restaurantId=${restaurantId}&tableId=${table.id}` : '');
-                  
-                  if (!tableLink) return null;
-                  
-                  return (
-                    <div style={styles.linkSection}>
-                      <div style={styles.linkHeader}>
-                        <span style={styles.linkIcon}>🔗</span>
-                        <span style={styles.linkLabel}>Customer Ordering Link</span>
-                      </div>
-                      <div style={styles.linkContainer}>
-                        <input
-                          type="text"
-                          value={tableLink}
-                          readOnly
-                          style={styles.urlInput}
-                          className="url-input"
-                          onClick={(e) => e.target.select()}
-                        />
-                        <div style={styles.linkButtons}>
-                          <button
-                            onClick={(e) => {
-                              navigator.clipboard.writeText(tableLink);
-                              const btn = e.target;
-                              const originalText = btn.textContent;
-                              btn.textContent = '✓ Copied!';
-                              btn.style.backgroundColor = '#16a34a';
-                              setTimeout(() => {
-                                btn.textContent = originalText;
-                                btn.style.backgroundColor = '#0284c7';
-                              }, 2000);
-                            }}
-                            style={styles.copyButton}
-                            className="copy-button"
-                            title="Copy link"
-                          >
-                            📋 Copy
-                          </button>
-                          <a
-                            href={tableLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={styles.openLinkButton}
-                            className="open-link-button"
-                            title="Open in new tab"
-                          >
-                            🔗 Open
-                          </a>
-                        </div>
-                      </div>
-                      <p style={styles.linkHelpText}>
-                        Share this link with customers or scan the QR code above
-                      </p>
+                </td>
+              </tr>
+            ) : (
+              sortedBranches.map((branch) => (
+                <tr key={branch.id} style={styles.tableRow}>
+                  <td style={styles.checkboxCell}>
+                    <input
+                      type="checkbox"
+                      checked={selectedBranches.has(branch.id)}
+                      onChange={() => handleSelectBranch(branch.id)}
+                      style={styles.checkbox}
+                    />
+                  </td>
+                  <td style={styles.actionCell}>
+                    <div style={styles.actionButtons}>
+                      <button
+                        onClick={() => handleEdit(branch)}
+                        style={styles.editButton}
+                        title="Edit"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleCopy(branch)}
+                        style={styles.copyButton}
+                        title="Copy"
+                      >
+                        📋
+                      </button>
                     </div>
-                  );
-                })()}
-                
-                <button
-                  onClick={() => deleteTable(table.id)}
-                  style={styles.deleteButton}
-                  className="delete-button"
-                >
-                  Delete Table
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+                  </td>
+                  <td style={styles.tableCell}>
+                    <button
+                      onClick={() => router.push(`/admin/tables/${branch.id}`)}
+                      style={styles.branchNameLink}
+                    >
+                      {branch.branchName}
+                    </button>
+                  </td>
+                  <td style={styles.tableCell}>{branch.location}</td>
+                  <td style={styles.tableCell}>{branch.tablesCount || 0}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
+
+      {/* Pagination */}
+      {sortedBranches.length > 0 && (
+        <div style={styles.pagination}>
+          <span style={styles.paginationText}>
+            Showing 1-{sortedBranches.length} of {sortedBranches.length} records
+          </span>
+        </div>
+      )}
+
+      {/* Create Branch Modal */}
+      {showCreateModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>Create New Branch</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={styles.modalClose}
+              >
+                ×
+              </button>
+            </div>
+            <div style={styles.modalBody}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Branch Name *</label>
+                <input
+                  type="text"
+                  value={branchName}
+                  onChange={(e) => setBranchName(e.target.value)}
+                  placeholder="e.g., Downtown Branch"
+                  style={styles.input}
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Location *</label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g., 123 Main St, City, State"
+                  style={styles.input}
+                />
+              </div>
+            </div>
+            <div style={styles.modalFooter}>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={styles.modalCancelButton}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createBranch}
+                disabled={creating}
+                style={styles.modalSubmitButton}
+              >
+                {creating ? 'Creating...' : 'Create Branch'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 const styles = {
   container: {
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '32px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    marginBottom: '8px',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: '14px',
-    color: '#666',
-    marginBottom: '32px',
+    padding: designSystem.spacing[8],
+    maxWidth: '1400px',
+    margin: '0 auto',
   },
   loadingContainer: {
     display: 'flex',
-    justifyContent: 'center',
+    flexDirection: 'column',
     alignItems: 'center',
-    padding: '40px',
+    justifyContent: 'center',
+    padding: designSystem.spacing[16],
+    gap: designSystem.spacing[4],
   },
   loadingText: {
-    fontSize: '16px',
-    color: '#666',
+    fontSize: designSystem.typography.fontSize.base,
+    color: designSystem.colors.text.secondary,
   },
-  errorBox: {
-    padding: '12px',
-    backgroundColor: '#fee',
-    border: '1px solid #fcc',
-    borderRadius: '4px',
-    color: '#c33',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  successBox: {
-    padding: '12px',
-    backgroundColor: '#efe',
-    border: '1px solid #cfc',
-    borderRadius: '4px',
-    color: '#3c3',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  createSection: {
-    marginBottom: '40px',
-    padding: '24px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-  },
-  sectionTitle: {
-    fontSize: '20px',
-    fontWeight: '600',
-    marginBottom: '20px',
-    color: '#333',
-  },
-  inputGroup: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'flex-end',
-    marginBottom: '12px',
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: '8px',
-    display: 'block',
-  },
-  input: {
-    padding: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '16px',
-    outline: 'none',
-    width: '150px',
-  },
-  button: {
-    padding: '12px 24px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    fontWeight: '500',
-    cursor: 'pointer',
-  },
-  helpText: {
-    fontSize: '12px',
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  tablesSection: {
-    marginTop: '32px',
-  },
-  tablesGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-    gap: '24px',
-    marginTop: '24px',
-  },
-  tableCard: {
-    border: '1px solid #e5e7eb',
-    borderRadius: '12px',
-    padding: '24px',
-    backgroundColor: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    transition: 'all 0.2s ease-in-out',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-  },
-  tableHeader: {
+  header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: '16px',
-    borderBottom: '2px solid #f3f4f6',
+    marginBottom: designSystem.spacing[6],
   },
-  tableNumber: {
-    fontSize: '20px',
-    fontWeight: '700',
+  title: {
+    fontSize: designSystem.typography.fontSize['3xl'],
+    fontWeight: designSystem.typography.fontWeight.bold,
+    color: designSystem.colors.text.primary,
     margin: 0,
-    color: '#111827',
+  },
+  newButton: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-  },
-  statusBadge: {
-    padding: '6px 14px',
-    borderRadius: '20px',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: 'white',
-    textTransform: 'capitalize',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-  },
-  qrSection: {
-    textAlign: 'center',
-    padding: '16px',
-    backgroundColor: '#f9fafb',
-    borderRadius: '10px',
-    border: '1px solid #e5e7eb',
-  },
-  qrImage: {
-    width: '180px',
-    height: '180px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    marginBottom: '16px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-    backgroundColor: '#ffffff',
-  },
-  qrActions: {
-    display: 'flex',
-    gap: '10px',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  downloadButton: {
-    padding: '10px 20px',
-    backgroundColor: '#16a34a',
-    color: 'white',
+    gap: designSystem.spacing[2],
+    padding: `${designSystem.spacing[2]} ${designSystem.spacing[4]}`,
+    backgroundColor: '#f97316', // Orange color
+    color: designSystem.colors.text.inverse,
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
+    borderRadius: designSystem.borderRadius.md,
+    fontSize: designSystem.typography.fontSize.base,
+    fontWeight: designSystem.typography.fontWeight.semibold,
     cursor: 'pointer',
-    transition: 'all 0.2s ease-in-out',
-    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
+    transition: designSystem.transitions.base,
+    boxShadow: designSystem.shadows.md,
   },
-  viewButton: {
-    padding: '10px 20px',
-    backgroundColor: '#0284c7',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease-in-out',
-    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
+  plusIcon: {
+    fontSize: designSystem.typography.fontSize.xl,
+    lineHeight: 1,
+    fontWeight: 'bold',
   },
-  linkSection: {
-    padding: '20px',
-    backgroundColor: '#f0f9ff',
-    borderRadius: '10px',
-    border: '2px solid #bae6fd',
+  tableCard: {
+    backgroundColor: designSystem.colors.surface,
+    borderRadius: designSystem.borderRadius.lg,
+    boxShadow: designSystem.shadows.base,
+    overflow: 'hidden',
+    border: `1px solid ${designSystem.colors.border}`,
   },
-  linkHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '12px',
-  },
-  linkIcon: {
-    fontSize: '18px',
-  },
-  linkLabel: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#0369a1',
-  },
-  linkContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
-  urlInput: {
+  table: {
     width: '100%',
-    padding: '12px 16px',
-    border: '2px solid #bae6fd',
-    borderRadius: '8px',
-    fontSize: '13px',
-    fontFamily: 'monospace',
-    backgroundColor: '#ffffff',
-    color: '#0284c7',
-    fontWeight: '500',
-    boxSizing: 'border-box',
-    transition: 'all 0.2s ease-in-out',
+    borderCollapse: 'collapse',
   },
-  linkButtons: {
+  tableHeaderRow: {
+    backgroundColor: designSystem.colors.gray[50],
+    borderBottom: `1px solid ${designSystem.colors.border}`,
+  },
+  checkboxHeader: {
+    width: '50px',
+    padding: `${designSystem.spacing[3]} ${designSystem.spacing[4]}`,
+  },
+  actionHeader: {
+    width: '100px',
+    padding: `${designSystem.spacing[3]} ${designSystem.spacing[4]}`,
+  },
+  tableHeader: {
+    padding: `${designSystem.spacing[4]} ${designSystem.spacing[6]}`,
+    textAlign: 'left',
+    fontSize: designSystem.typography.fontSize.sm,
+    fontWeight: designSystem.typography.fontWeight.semibold,
+    color: designSystem.colors.text.primary,
+    cursor: 'pointer',
+    userSelect: 'none',
+  },
+  headerContent: {
     display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: designSystem.spacing[2],
+  },
+  sortIcon: {
+    fontSize: designSystem.typography.fontSize.sm,
+    color: designSystem.colors.primary[600],
+  },
+  filterIcon: {
+    fontSize: designSystem.typography.fontSize.sm,
+    color: designSystem.colors.text.secondary,
+    marginLeft: designSystem.spacing[1],
+    cursor: 'pointer',
+  },
+  tableRow: {
+    borderBottom: `1px solid ${designSystem.colors.border}`,
+    transition: designSystem.transitions.base,
+  },
+  checkboxCell: {
+    padding: `${designSystem.spacing[3]} ${designSystem.spacing[4]}`,
+    width: '50px',
+  },
+  actionCell: {
+    padding: `${designSystem.spacing[3]} ${designSystem.spacing[4]}`,
+    width: '100px',
+  },
+  actionButtons: {
+    display: 'flex',
+    gap: designSystem.spacing[2],
+  },
+  editButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: designSystem.typography.fontSize.base,
+    padding: designSystem.spacing[1],
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: designSystem.transitions.base,
   },
   copyButton: {
-    flex: 1,
-    minWidth: '100px',
-    padding: '12px 20px',
-    backgroundColor: '#0284c7',
-    color: 'white',
+    background: 'none',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
     cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    transition: 'all 0.2s ease-in-out',
-    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
-  },
-  openLinkButton: {
-    flex: 1,
-    minWidth: '100px',
-    padding: '12px 20px',
-    backgroundColor: '#16a34a',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    textDecoration: 'none',
-    whiteSpace: 'nowrap',
-    transition: 'all 0.2s ease-in-out',
-    display: 'inline-flex',
+    fontSize: designSystem.typography.fontSize.base,
+    padding: designSystem.spacing[1],
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)',
+    transition: designSystem.transitions.base,
+    color: designSystem.colors.gray[600],
   },
-  linkHelpText: {
-    fontSize: '12px',
-    color: '#0369a1',
-    marginTop: '12px',
-    marginBottom: 0,
-    textAlign: 'center',
-  },
-  deleteButton: {
-    width: '100%',
-    padding: '12px',
-    backgroundColor: '#dc2626',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
+  checkbox: {
+    width: '18px',
+    height: '18px',
     cursor: 'pointer',
-    transition: 'all 0.2s ease-in-out',
-    boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+  },
+  tableCell: {
+    padding: `${designSystem.spacing[4]} ${designSystem.spacing[6]}`,
+    fontSize: designSystem.typography.fontSize.base,
+    color: designSystem.colors.text.primary,
+  },
+  branchNameLink: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    fontSize: designSystem.typography.fontSize.base,
+    color: designSystem.colors.primary[600],
+    cursor: 'pointer',
+    textDecoration: 'none',
+    textAlign: 'left',
+    fontWeight: designSystem.typography.fontWeight.medium,
+    transition: designSystem.transitions.base,
+  },
+  emptyCell: {
+    padding: designSystem.spacing[16],
+    textAlign: 'center',
   },
   emptyState: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#999',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: designSystem.spacing[4],
+  },
+  emptyIcon: {
+    fontSize: '64px',
+    marginBottom: designSystem.spacing[2],
+  },
+  emptyTitle: {
+    fontSize: designSystem.typography.fontSize.xl,
+    fontWeight: designSystem.typography.fontWeight.semibold,
+    color: designSystem.colors.text.primary,
+    margin: 0,
+  },
+  emptyText: {
+    fontSize: designSystem.typography.fontSize.base,
+    color: designSystem.colors.text.secondary,
+    margin: 0,
+    marginBottom: designSystem.spacing[4],
+  },
+  emptyButton: {
+    padding: `${designSystem.spacing[3]} ${designSystem.spacing[6]}`,
+    backgroundColor: designSystem.colors.primary[600],
+    color: designSystem.colors.text.inverse,
+    border: 'none',
+    borderRadius: designSystem.borderRadius.md,
+    fontSize: designSystem.typography.fontSize.base,
+    fontWeight: designSystem.typography.fontWeight.semibold,
+    cursor: 'pointer',
+    transition: designSystem.transitions.base,
+  },
+  pagination: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    padding: `${designSystem.spacing[4]} ${designSystem.spacing[6]}`,
+    borderTop: `1px solid ${designSystem.colors.border}`,
+    backgroundColor: designSystem.colors.gray[50],
+  },
+  paginationText: {
+    fontSize: designSystem.typography.fontSize.sm,
+    color: designSystem.colors.text.secondary,
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: designSystem.zIndex.modal,
+    padding: designSystem.spacing[4],
+  },
+  modal: {
+    backgroundColor: designSystem.colors.surface,
+    borderRadius: designSystem.borderRadius.xl,
+    boxShadow: designSystem.shadows['2xl'],
+    maxWidth: '500px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflow: 'auto',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: designSystem.spacing[6],
+    borderBottom: `1px solid ${designSystem.colors.border}`,
+  },
+  modalTitle: {
+    fontSize: designSystem.typography.fontSize.xl,
+    fontWeight: designSystem.typography.fontWeight.bold,
+    color: designSystem.colors.text.primary,
+    margin: 0,
+  },
+  modalClose: {
+    background: 'none',
+    border: 'none',
+    fontSize: designSystem.typography.fontSize['3xl'],
+    color: designSystem.colors.text.secondary,
+    cursor: 'pointer',
+    lineHeight: 1,
+    padding: 0,
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBody: {
+    padding: designSystem.spacing[6],
+  },
+  modalFooter: {
+    display: 'flex',
+    gap: designSystem.spacing[3],
+    justifyContent: 'flex-end',
+    padding: designSystem.spacing[6],
+    borderTop: `1px solid ${designSystem.colors.border}`,
+  },
+  formGroup: {
+    marginBottom: designSystem.spacing[4],
+  },
+  label: {
+    display: 'block',
+    fontSize: designSystem.typography.fontSize.sm,
+    fontWeight: designSystem.typography.fontWeight.medium,
+    color: designSystem.colors.text.primary,
+    marginBottom: designSystem.spacing[2],
+  },
+  input: {
+    width: '100%',
+    padding: `${designSystem.spacing[3]} ${designSystem.spacing[4]}`,
+    border: `1px solid ${designSystem.colors.border}`,
+    borderRadius: designSystem.borderRadius.md,
+    fontSize: designSystem.typography.fontSize.base,
+    backgroundColor: designSystem.colors.surface,
+    color: designSystem.colors.text.primary,
+    boxSizing: 'border-box',
+    outline: 'none',
+    transition: designSystem.transitions.base,
+  },
+  modalCancelButton: {
+    padding: `${designSystem.spacing[3]} ${designSystem.spacing[6]}`,
+    backgroundColor: designSystem.colors.surface,
+    color: designSystem.colors.text.secondary,
+    border: `1px solid ${designSystem.colors.border}`,
+    borderRadius: designSystem.borderRadius.md,
+    fontSize: designSystem.typography.fontSize.base,
+    fontWeight: designSystem.typography.fontWeight.medium,
+    cursor: 'pointer',
+    transition: designSystem.transitions.base,
+  },
+  modalSubmitButton: {
+    padding: `${designSystem.spacing[3]} ${designSystem.spacing[6]}`,
+    backgroundColor: designSystem.colors.primary[600],
+    color: designSystem.colors.text.inverse,
+    border: 'none',
+    borderRadius: designSystem.borderRadius.md,
+    fontSize: designSystem.typography.fontSize.base,
+    fontWeight: designSystem.typography.fontWeight.semibold,
+    cursor: 'pointer',
+    transition: designSystem.transitions.base,
   },
 };
-

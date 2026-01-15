@@ -21,7 +21,7 @@ export default function AdminNavbar() {
           <Link href="/admin/dashboard" style={styles.navLink}>
             Dashboard
           </Link>
-          <Link href="/admin/restaurant" style={styles.navLink}>
+          <Link href="/admin/manage" style={styles.navLink}>
             My Restaurant
           </Link>
           <Link href="/admin/menu" style={styles.navLink}>

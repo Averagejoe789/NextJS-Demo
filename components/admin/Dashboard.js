@@ -49,7 +49,7 @@ export default function Dashboard() {
           <p style={styles.setupText}>
             You haven't registered your restaurant yet. Complete your restaurant profile to get started.
           </p>
-          <Link href="/admin/restaurant" style={styles.setupButton}>
+          <Link href="/admin/manage" style={styles.setupButton}>
             Register Restaurant
           </Link>
         </div>
@@ -84,7 +84,7 @@ export default function Dashboard() {
           <div style={styles.quickActions}>
             <h2 style={styles.sectionTitle}>Quick Actions</h2>
             <div style={styles.actionsGrid}>
-              <Link href="/admin/restaurant" style={styles.actionCard}>
+              <Link href="/admin/manage" style={styles.actionCard}>
                 <div style={styles.actionIcon}>✏️</div>
                 <h3 style={styles.actionTitle}>Edit Restaurant</h3>
                 <p style={styles.actionDescription}>Update your restaurant information</p>
