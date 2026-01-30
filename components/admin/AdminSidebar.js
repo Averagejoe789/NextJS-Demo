@@ -1,17 +1,38 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { logOut } from '../../lib/auth-utils';
+import { logOut, onAuthChange } from '../../lib/auth-utils';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function AdminSidebar({ sidebarOpen, setSidebarOpen }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isApprover, setIsApprover] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     restaurant: true, // Restaurant is expanded by default
     manage: false,
   });
+
+  useEffect(() => {
+    const unsubscribe = onAuthChange(async (user) => {
+      if (!user) {
+        setIsApprover(false);
+        return;
+      }
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/admin/am-i-approver', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        setIsApprover(data.approver === true);
+      } catch {
+        setIsApprover(false);
+      }
+    });
+    return () => unsubscribe?.();
+  }, []);
 
   const handleLogout = async () => {
     await logOut();
@@ -97,6 +118,24 @@ export default function AdminSidebar({ sidebarOpen, setSidebarOpen }) {
 
         {/* Navigation */}
         <nav style={styles.nav}>
+          {/* Approvals (approvers only) */}
+          {isApprover && (
+            <Link
+              href="/admin/approvals"
+              style={{
+                ...styles.navItem,
+                ...(pathname === '/admin/approvals' ? styles.navItemActive : {})
+              }}
+              className={pathname === '/admin/approvals' ? 'nav-item active' : 'nav-item'}
+              onClick={() => {
+                if (window.innerWidth < 768) setSidebarOpen(false);
+              }}
+            >
+              <span style={styles.navIcon}>✓</span>
+              <span style={styles.navLabel}>Approvals</span>
+            </Link>
+          )}
+
           {/* Primary Menu Items */}
           {navItems.map((item) => {
             const isActive = pathname === item.href;
@@ -237,6 +276,19 @@ export default function AdminSidebar({ sidebarOpen, setSidebarOpen }) {
             );
           })}
         </nav>
+
+        {/* Log out */}
+        <div style={styles.logoutSection}>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={styles.logoutButton}
+            aria-label="Log out"
+          >
+            <span style={styles.navIcon}>↪</span>
+            <span style={styles.navLabel}>Log out</span>
+          </button>
+        </div>
       </aside>
     </>
   );
@@ -393,5 +445,26 @@ const styles = {
     backgroundColor: '#f3f4f6',
     color: '#111827',
     fontWeight: 500,
+  },
+  logoutSection: {
+    padding: '0.75rem 0.5rem',
+    borderTop: '1px solid #e5e7eb',
+    marginTop: 'auto',
+  },
+  logoutButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '0.75rem 1rem',
+    borderRadius: '0.5rem',
+    width: '100%',
+    border: 'none',
+    backgroundColor: 'transparent',
+    color: '#6b7280',
+    fontSize: '0.9375rem',
+    fontWeight: 500,
+    cursor: 'pointer',
+    textAlign: 'left',
+    transition: 'all 200ms ease-in-out',
   },
 };

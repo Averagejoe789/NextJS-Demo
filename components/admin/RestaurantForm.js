@@ -1,47 +1,70 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db, storage } from '../../lib/firebase-client';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getCurrentUser } from '../../lib/auth-utils';
 
-export default function RestaurantForm() {
-  const [loading, setLoading] = useState(false);
+const emptyForm = {
+  name: '',
+  description: '',
+  address: '',
+  phone: '',
+  email: '',
+  cuisine: '',
+  logoUrl: '',
+};
+
+export default function RestaurantForm({ isOnboarding = false, resubmit = false, onSuccess }) {
+  const [loading, setLoading] = useState(!isOnboarding || resubmit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    address: '',
-    phone: '',
-    email: '',
-    cuisine: '',
-    logoUrl: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
-    // TEMPORARY: Use dummy data instead of loading from Firestore
-    setFormData({
-      name: 'Sample Restaurant',
-      description: 'A wonderful Italian restaurant serving authentic cuisine',
-      address: '123 Main St, City, State 12345',
-      phone: '(555) 123-4567',
-      email: 'contact@restaurant.com',
-      cuisine: 'Italian',
-      logoUrl: '',
-    });
-    setLoading(false);
-    
-    // Original code (commented out):
-    // loadRestaurantData();
-  }, []);
+    if (isOnboarding && !resubmit) {
+      const user = getCurrentUser();
+      setFormData({
+        ...emptyForm,
+        email: user?.email || '',
+      });
+      setLoading(false);
+      return;
+    }
+    loadRestaurantData();
+  }, [isOnboarding, resubmit]);
 
-  // Original loadRestaurantData function (commented out):
-  // const loadRestaurantData = async () => { ... }
+  const loadRestaurantData = async () => {
+    const user = getCurrentUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const restaurantRef = doc(db, 'restaurants', user.uid);
+      const restaurantSnap = await getDoc(restaurantRef);
+      if (restaurantSnap.exists()) {
+        const data = restaurantSnap.data();
+        setFormData({
+          name: data.name || '',
+          description: data.description || '',
+          address: data.address || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          cuisine: data.cuisine || '',
+          logoUrl: data.logoUrl || '',
+        });
+      }
+    } catch (err) {
+      console.error('Error loading restaurant:', err);
+      setError(err.message || 'Failed to load restaurant');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -78,34 +101,41 @@ export default function RestaurantForm() {
     setSuccess('');
     setSaving(true);
 
-    // TEMPORARY: Just show success message, don't save to Firestore
-    setTimeout(() => {
-      setSuccess('Restaurant information saved successfully! (Demo mode - not saved)');
+    try {
+      const user = getCurrentUser();
+      if (!user) {
+        throw new Error('You must be signed in to save.');
+      }
+      let logoUrl = formData.logoUrl;
+      if (logoFile) {
+        logoUrl = await uploadLogo();
+      }
+      const restaurantData = {
+        ...formData,
+        logoUrl: logoUrl || null,
+        ownerId: user.uid,
+        updatedAt: serverTimestamp(),
+      };
+      if (isOnboarding) {
+        restaurantData.createdAt = serverTimestamp();
+      }
+      if (isOnboarding || resubmit) {
+        restaurantData.status = 'pending';
+        if (resubmit) restaurantData.rejectionReason = null;
+      }
+      const restaurantRef = doc(db, 'restaurants', user.uid);
+      await setDoc(restaurantRef, restaurantData, { merge: true });
+      setSuccess('Restaurant information saved successfully!');
       setLogoFile(null);
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (err) {
+      console.error('Error saving restaurant:', err);
+      setError(err.message || 'Failed to save restaurant information');
+    } finally {
       setSaving(false);
-    }, 500);
-
-    // Original save code (commented out):
-    // try {
-    //   const user = getCurrentUser();
-    //   if (!user) {
-    //     throw new Error('User not authenticated');
-    //   }
-    //   let logoUrl = formData.logoUrl;
-    //   if (logoFile) {
-    //     logoUrl = await uploadLogo();
-    //   }
-    //   const restaurantData = { ...formData, logoUrl, ownerId: user.uid, updatedAt: new Date().toISOString() };
-    //   const restaurantRef = doc(db, 'restaurants', user.uid);
-    //   await setDoc(restaurantRef, restaurantData, { merge: true });
-    //   setSuccess('Restaurant information saved successfully!');
-    //   setLogoFile(null);
-    // } catch (err) {
-    //   console.error('Error saving restaurant:', err);
-    //   setError(err.message || 'Failed to save restaurant information');
-    // } finally {
-    //   setSaving(false);
-    // }
+    }
   };
 
   const handleChange = (e) => {
@@ -125,8 +155,12 @@ export default function RestaurantForm() {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Restaurant Information</h1>
-      <p style={styles.subtitle}>Manage your restaurant details</p>
+      {!isOnboarding && (
+        <>
+          <h1 style={styles.title}>Restaurant Information</h1>
+          <p style={styles.subtitle}>Manage your restaurant details</p>
+        </>
+      )}
 
       {error && (
         <div style={styles.errorBox}>
@@ -239,7 +273,7 @@ export default function RestaurantForm() {
           disabled={saving}
           style={styles.button}
         >
-          {saving ? 'Saving...' : 'Save Restaurant Information'}
+          {saving ? 'Saving...' : resubmit ? 'Resubmit for approval' : isOnboarding ? 'Submit for approval' : 'Save Restaurant Information'}
         </button>
       </form>
     </div>

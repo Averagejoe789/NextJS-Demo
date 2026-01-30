@@ -27,6 +27,11 @@ Your `.env` file now contains all the necessary environment variables for produc
 
 **Note:** The `NEXT_PUBLIC_` prefix makes these variables available in the browser (client-side).
 
+### 4. Restaurant approval (optional)
+- `APPROVER_EMAILS` - Comma-separated list of emails who can approve pending restaurants (e.g. `admin@example.com,owner@example.com`)
+  - Used by API routes `/api/admin/am-i-approver`, `/api/admin/pending-restaurants`, `/api/admin/approve-restaurant`
+  - If unset or empty, no one can approve; new restaurants stay in "pending" until you set this and an approver approves them
+
 ## 🚀 Production Deployment Steps
 
 ### For Vercel:
