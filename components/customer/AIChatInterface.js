@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { db } from '../../lib/firebase-client';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -7,16 +7,24 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
   const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // Suggested questions for friendly UX
   const suggestedQuestions = [
     "What do you recommend?",
     "Show me vegetarian options",
     "What's your most popular dish?",
     "I'd like to order a pizza",
+  ];
+
+  const followUpSuggestions = [
+    "Tell me more",
+    "Add it to my cart",
+    "What else do you have?",
+    "Show my cart",
   ];
 
   // Auto-resize textarea
@@ -32,11 +40,25 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Track scroll position for scroll-to-bottom button
+  const handleScroll = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    setShowScrollBtn(distanceFromBottom > 150);
+  }, []);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
+
   // Set up Firestore listener for real-time updates
   useEffect(() => {
-    if (!restaurantId || !chatId) {
-      return;
-    }
+    if (!restaurantId || !chatId) return;
 
     let isMounted = true;
     let unsubscribe = null;
@@ -48,10 +70,9 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
           `restaurants/${restaurantId}/chatSessions/${chatId}/messages`
         );
         const q = query(messagesRef, orderBy('timestamp', 'asc'));
-        
+
         unsubscribe = onSnapshot(q, (snapshot) => {
           if (!isMounted) return;
-          
           const messagesList = snapshot.docs.map(doc => ({
             id: doc.id,
             text: doc.data().text || '',
@@ -60,7 +81,6 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
             metadata: doc.data().metadata || {},
             timestamp: doc.data().timestamp
           }));
-          
           setMessages(messagesList);
         }, (error) => {
           console.error('Firestore listener error:', error);
@@ -74,9 +94,7 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
 
     return () => {
       isMounted = false;
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      if (unsubscribe) unsubscribe();
     };
   }, [restaurantId, chatId]);
 
@@ -88,18 +106,15 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
       return;
     }
 
-    if (!messageText) {
-      setInputText('');
-    }
+    if (!messageText) setInputText('');
     setLoading(true);
 
     try {
-      // Save user message to Firestore
       const messagesRef = collection(
         db,
         `restaurants/${restaurantId}/chatSessions/${chatId}/messages`
       );
-      
+
       await addDoc(messagesRef, {
         text: textToSend,
         sender: 'user',
@@ -107,7 +122,6 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
         timestamp: serverTimestamp()
       });
 
-      // Call AI API
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,7 +148,6 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
 
       const aiResponse = await response.json();
 
-      // Save AI response to Firestore
       await addDoc(messagesRef, {
         text: aiResponse.text,
         sender: 'assistant',
@@ -146,7 +159,6 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
         timestamp: serverTimestamp()
       });
 
-      // Handle action if present
       if (aiResponse.action === 'add_to_cart' && aiResponse.items) {
         aiResponse.items.forEach(item => {
           if (item.menuItemId && item.quantity) {
@@ -160,20 +172,18 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
 
     } catch (error) {
       console.error('Error sending message:', error);
-      
-      // Save friendly error message to chat
       const messagesRef = collection(
         db,
         `restaurants/${restaurantId}/chatSessions/${chatId}/messages`
       );
-      
-      let errorMessage = 'Oops! 😅 Something went wrong. Could you please try again?';
+
+      let errorMessage = 'Oops! Something went wrong. Could you please try again?';
       if (error.message?.includes('OPENAI_API_KEY') || error.message?.includes('configuration')) {
-        errorMessage = 'I\'m having trouble connecting right now. Please let the staff know! 😊';
+        errorMessage = 'I\'m having trouble connecting right now. Please let the staff know!';
       } else if (error.message?.includes('Rate limit') || error.message?.includes('429')) {
-        errorMessage = 'I\'m getting a lot of requests! Please wait a moment and try again. ⏱️';
+        errorMessage = 'I\'m getting a lot of requests! Please wait a moment and try again.';
       }
-      
+
       await addDoc(messagesRef, {
         text: errorMessage,
         sender: 'assistant',
@@ -192,493 +202,253 @@ export default function AIChatInterface({ restaurantId, tableId, chatId, menuIte
     }
   };
 
-  const handleSuggestedQuestion = (question) => {
-    handleSendMessage(question);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const copyMessage = async (text, id) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const charCount = inputText.length;
+  const maxChars = 500;
+  const lastMessage = messages[messages.length - 1];
+  const showFollowUp = !loading && messages.length > 0 && lastMessage?.sender === 'assistant';
+
   return (
-    <div style={styles.container} className="chatgpt-chat-container">
+    <div className="chat-container">
       {/* Messages Area */}
-      <div style={styles.messagesContainer} className="chatgpt-messages">
+      <div className="chat-messages" ref={messagesContainerRef}>
         {messages.length === 0 ? (
-          <div style={styles.welcomeMessage}>
-            <div style={styles.welcomeAvatar}>
-              <div style={styles.avatarIcon}>🤖</div>
+          <div className="chat-welcome">
+            <div className="chat-welcome__avatar">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 8V4H8" />
+                <rect x="2" y="2" width="20" height="20" rx="5" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                <line x1="9" y1="9" x2="9.01" y2="9" strokeWidth="3" strokeLinecap="round" />
+                <line x1="15" y1="9" x2="15.01" y2="9" strokeWidth="3" strokeLinecap="round" />
+              </svg>
             </div>
-            <h2 style={styles.welcomeTitle}>
-              👋 Hi! I'm your friendly AI assistant
+            <h2 className="chat-welcome__title">
+              Hi there! I'm your AI assistant
             </h2>
-            <p style={styles.welcomeSubtext}>
-              I'm here to help you discover amazing dishes, answer questions about our menu, 
-              and help you place your order. What can I do for you today?
+            <p className="chat-welcome__subtitle">
+              I can help you explore our menu, find dishes that match your taste,
+              and place your order. What sounds good today?
             </p>
-            
-            {/* Suggested Questions */}
-            <div style={styles.suggestionsContainer}>
-              <p style={styles.suggestionsLabel}>Try asking me:</p>
-              <div style={styles.suggestionsGrid}>
+
+            <div className="chat-welcome__suggestions">
+              <p className="chat-welcome__suggestions-label">Try asking me:</p>
+              <div className="chat-welcome__suggestions-grid">
                 {suggestedQuestions.map((question, index) => (
                   <button
                     key={index}
-                    onClick={() => handleSuggestedQuestion(question)}
-                    style={styles.suggestionButton}
-                    className="suggestion-button"
+                    onClick={() => handleSendMessage(question)}
+                    className="chat-suggestion-chip"
                   >
+                    <span className="chat-suggestion-chip__icon">
+                      {index === 0 && '✨'}
+                      {index === 1 && '🥗'}
+                      {index === 2 && '🔥'}
+                      {index === 3 && '🍕'}
+                    </span>
                     {question}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Quick Info */}
-            <div style={styles.quickInfo}>
-              <div style={styles.quickInfoItem}>
-                <span style={styles.quickInfoIcon}>📋</span>
-                <span style={styles.quickInfoText}>Browse menu items</span>
+            <div className="chat-welcome__capabilities">
+              <div className="chat-welcome__capability">
+                <div className="chat-welcome__capability-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+                </div>
+                <span>Browse the full menu</span>
               </div>
-              <div style={styles.quickInfoItem}>
-                <span style={styles.quickInfoIcon}>🌱</span>
-                <span style={styles.quickInfoText}>Ask about allergens</span>
+              <div className="chat-welcome__capability">
+                <div className="chat-welcome__capability-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                </div>
+                <span>Ask about allergens & dietary info</span>
               </div>
-              <div style={styles.quickInfoItem}>
-                <span style={styles.quickInfoIcon}>🛒</span>
-                <span style={styles.quickInfoText}>Order food naturally</span>
+              <div className="chat-welcome__capability">
+                <div className="chat-welcome__capability-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
+                </div>
+                <span>Add items to your cart naturally</span>
               </div>
             </div>
           </div>
         ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              style={{
-                ...styles.messageWrapper,
-                ...(message.sender === 'user' ? styles.userWrapper : styles.assistantWrapper)
-              }}
-              className={`message-wrapper ${message.sender}`}
-            >
-              {message.sender === 'assistant' && (
-                <div style={styles.assistantAvatar}>
-                  <div style={styles.avatarIcon}>🤖</div>
-                </div>
-              )}
-              <div
-                style={{
-                  ...styles.message,
-                  ...(message.sender === 'user' ? styles.userMessage : styles.assistantMessage)
-                }}
-                className={`message ${message.sender === 'user' ? 'user' : 'assistant'}`}
-              >
-                {message.text.split('\n').map((line, i) => (
-                  <div key={i} style={{ 
-                    marginBottom: i < message.text.split('\n').length - 1 ? '0.5rem' : '0',
-                    lineHeight: 1.6
-                  }}>
-                    {line}
+          <>
+            {messages.map((message, index) => {
+              const isUser = message.sender === 'user';
+              const prevMessage = index > 0 ? messages[index - 1] : null;
+              const isGrouped = prevMessage?.sender === message.sender;
+
+              return (
+                <div
+                  key={message.id}
+                  className={`chat-msg ${isUser ? 'chat-msg--user' : 'chat-msg--assistant'} ${isGrouped ? 'chat-msg--grouped' : ''}`}
+                >
+                  {!isUser && !isGrouped && (
+                    <div className="chat-msg__avatar chat-msg__avatar--ai">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 8V4H8" />
+                        <rect x="2" y="2" width="20" height="20" rx="5" />
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                        <line x1="9" y1="9" x2="9.01" y2="9" strokeWidth="3" strokeLinecap="round" />
+                        <line x1="15" y1="9" x2="15.01" y2="9" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  )}
+                  {!isUser && isGrouped && <div className="chat-msg__avatar-spacer" />}
+
+                  <div className="chat-msg__content">
+                    <div className={`chat-msg__bubble ${isUser ? 'chat-msg__bubble--user' : 'chat-msg__bubble--assistant'} ${message.type === 'error' ? 'chat-msg__bubble--error' : ''}`}>
+                      {message.text.split('\n').map((line, i, arr) => (
+                        <div key={i} className={i < arr.length - 1 ? 'chat-msg__line chat-msg__line--spaced' : 'chat-msg__line'}>
+                          {line || '\u00A0'}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className={`chat-msg__meta ${isUser ? 'chat-msg__meta--user' : ''}`}>
+                      <span className="chat-msg__time">{formatTimestamp(message.timestamp)}</span>
+                      {!isUser && (
+                        <button
+                          className={`chat-msg__copy ${copiedId === message.id ? 'chat-msg__copy--copied' : ''}`}
+                          onClick={() => copyMessage(message.text, message.id)}
+                          title="Copy message"
+                        >
+                          {copiedId === message.id ? (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {isUser && !isGrouped && (
+                    <div className="chat-msg__avatar chat-msg__avatar--user">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                    </div>
+                  )}
+                  {isUser && isGrouped && <div className="chat-msg__avatar-spacer" />}
+                </div>
+              );
+            })}
+
+            {/* Follow-up suggestions */}
+            {showFollowUp && (
+              <div className="chat-followup">
+                {followUpSuggestions.map((suggestion, i) => (
+                  <button
+                    key={i}
+                    className="chat-followup__chip"
+                    onClick={() => handleSendMessage(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
                 ))}
-                {message.type === 'error' && (
-                  <div style={styles.errorNote}>
-                    <span style={styles.errorIcon}>⚠️</span>
-                    <span>There was an issue, but I'm here to help!</span>
-                  </div>
-                )}
               </div>
-              {message.sender === 'user' && (
-                <div style={styles.userAvatar}>
-                  <div style={styles.userIcon}>👤</div>
-                </div>
-              )}
-            </div>
-          ))
+            )}
+          </>
         )}
+
+        {/* Loading indicator */}
         {loading && (
-          <div style={styles.loadingWrapper}>
-            <div style={styles.assistantAvatar}>
-              <div style={styles.avatarIcon}>🤖</div>
+          <div className="chat-msg chat-msg--assistant">
+            <div className="chat-msg__avatar chat-msg__avatar--ai">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 8V4H8" />
+                <rect x="2" y="2" width="20" height="20" rx="5" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                <line x1="9" y1="9" x2="9.01" y2="9" strokeWidth="3" strokeLinecap="round" />
+                <line x1="15" y1="9" x2="15.01" y2="9" strokeWidth="3" strokeLinecap="round" />
+              </svg>
             </div>
-            <div style={styles.loadingBubble}>
-              <div style={styles.loadingDots}>
-                <span style={styles.loadingDot}></span>
-                <span style={{ ...styles.loadingDot, animationDelay: '0.2s' }}></span>
-                <span style={{ ...styles.loadingDot, animationDelay: '0.4s' }}></span>
+            <div className="chat-msg__content">
+              <div className="chat-msg__bubble chat-msg__bubble--assistant chat-typing">
+                <span className="chat-typing__dot"></span>
+                <span className="chat-typing__dot"></span>
+                <span className="chat-typing__dot"></span>
               </div>
             </div>
           </div>
         )}
+
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Friendly Design */}
-      <div style={styles.inputWrapper} className="chatgpt-input-wrapper">
-        <div style={styles.inputContainer}>
+      {/* Scroll to bottom button */}
+      {showScrollBtn && (
+        <button className="chat-scroll-btn" onClick={scrollToBottom} aria-label="Scroll to bottom">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      )}
+
+      {/* Input Area */}
+      <div className="chat-input">
+        <div className="chat-input__container">
           <textarea
             ref={textareaRef}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyPress}
-            placeholder="Type your message... (Ask about menu, place order, or say hello!)"
-            style={styles.textarea}
+            placeholder="Ask about our menu, place an order..."
+            className="chat-input__textarea"
             disabled={loading}
             rows={1}
-            maxLength={500}
+            maxLength={maxChars}
           />
-          <button 
-            onClick={() => handleSendMessage()} 
+          <button
+            onClick={() => handleSendMessage()}
             disabled={loading || !inputText.trim()}
-            style={{
-              ...styles.sendButton,
-              ...(loading || !inputText.trim() ? styles.sendButtonDisabled : {})
-            }}
-            className="send-button"
+            className="chat-input__send"
             aria-label="Send message"
           >
             {loading ? (
-              <div style={styles.sendButtonSpinner}></div>
+              <div className="chat-input__spinner"></div>
             ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
               </svg>
             )}
           </button>
         </div>
+        {charCount > 0 && (
+          <div className={`chat-input__charcount ${charCount > maxChars * 0.9 ? 'chat-input__charcount--warn' : ''}`}>
+            {charCount}/{maxChars}
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    minHeight: '600px',
-    backgroundColor: '#ffffff',
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: '0.5rem',
-    border: 'none',
-    marginBottom: 0,
-    paddingBottom: 0,
-  },
-  
-  messagesContainer: {
-    flex: 1,
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    padding: '0.75rem 0.5rem',
-    paddingBottom: '0.75rem',
-    scrollBehavior: 'smooth',
-    WebkitOverflowScrolling: 'touch',
-    backgroundColor: '#f9fafb',
-    marginBottom: 0,
-  },
-  
-  // Welcome Message
-  welcomeMessage: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '100%',
-    padding: '1.5rem 0.5rem',
-    textAlign: 'center',
-    maxWidth: '100%',
-    margin: '0 auto',
-  },
-  
-  welcomeAvatar: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '50%',
-    backgroundColor: '#e0f2fe',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '1.5rem',
-    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.2)',
-    animation: 'fadeIn 400ms ease-in-out',
-  },
-  
-  avatarIcon: {
-    fontSize: '2rem',
-  },
-  
-  welcomeTitle: {
-    fontSize: 'clamp(1.5rem, 4vw, 2rem)',
-    fontWeight: 700,
-    color: '#111827',
-    margin: '0 0 0.75rem 0',
-    lineHeight: 1.3,
-  },
-  
-  welcomeSubtext: {
-    fontSize: 'clamp(0.875rem, 2vw, 1rem)',
-    color: '#6b7280',
-    margin: '0 0 2rem 0',
-    lineHeight: 1.6,
-    maxWidth: '500px',
-  },
-  
-  // Suggested Questions
-  suggestionsContainer: {
-    width: '100%',
-    marginBottom: '2rem',
-  },
-  
-  suggestionsLabel: {
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    color: '#374151',
-    marginBottom: '0.75rem',
-    textAlign: 'left',
-  },
-  
-  suggestionsGrid: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
-    alignItems: 'stretch',
-  },
-  
-  suggestionButton: {
-    padding: '0.75rem 1.25rem',
-    backgroundColor: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '0.75rem',
-    fontSize: '0.875rem',
-    fontWeight: 500,
-    color: '#374151',
-    cursor: 'pointer',
-    transition: 'all 200ms ease-in-out',
-    textAlign: 'left',
-    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-    minHeight: '44px', // Touch-friendly
-  },
-  
-  // Quick Info
-  quickInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.625rem',
-    width: '100%',
-    padding: '0.875rem',
-    backgroundColor: '#ffffff',
-    borderRadius: '0.75rem',
-    border: '1px solid #e5e7eb',
-    marginTop: '1rem',
-  },
-  
-  quickInfoItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-    fontSize: '0.875rem',
-    color: '#6b7280',
-  },
-  
-  quickInfoIcon: {
-    fontSize: '1.25rem',
-  },
-  
-  quickInfoText: {
-    fontSize: '0.875rem',
-    fontWeight: 500,
-  },
-  
-  // Message Wrappers
-  messageWrapper: {
-    display: 'flex',
-    gap: '0.5rem',
-    padding: '0.5rem 0.5rem',
-    alignItems: 'flex-start',
-    maxWidth: '100%',
-    animation: 'fadeIn 300ms ease-in-out',
-  },
-  
-  userWrapper: {
-    flexDirection: 'row-reverse',
-  },
-  
-  assistantWrapper: {
-    flexDirection: 'row',
-  },
-  
-  // Avatars
-  assistantAvatar: {
-    width: '28px',
-    height: '28px',
-    borderRadius: '50%',
-    backgroundColor: '#e0f2fe',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  
-  userAvatar: {
-    width: '28px',
-    height: '28px',
-    borderRadius: '50%',
-    backgroundColor: '#0284c7',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  
-  userIcon: {
-    fontSize: '1.125rem',
-    color: '#ffffff',
-  },
-  
-  // Messages
-  message: {
-    maxWidth: '92%',
-    wordWrap: 'break-word',
-    lineHeight: 1.6,
-    fontSize: '0.9375rem',
-    padding: '0.75rem 1rem',
-    borderRadius: '0.75rem',
-    whiteSpace: 'pre-wrap',
-    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-  },
-  
-  userMessage: {
-    backgroundColor: '#0284c7',
-    color: '#ffffff',
-    borderBottomRightRadius: '0.25rem',
-  },
-  
-  assistantMessage: {
-    backgroundColor: '#ffffff',
-    color: '#374151',
-    border: 'none',
-    borderBottomLeftRadius: '0.25rem',
-  },
-  
-  errorNote: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    marginTop: '0.5rem',
-    padding: '0.5rem',
-    backgroundColor: '#fef2f2',
-    borderRadius: '0.5rem',
-    fontSize: '0.875rem',
-    color: '#dc2626',
-  },
-  
-  errorIcon: {
-    fontSize: '1rem',
-  },
-  
-  // Loading State
-  loadingWrapper: {
-    display: 'flex',
-    gap: '0.5rem',
-    padding: '0.5rem 0.5rem',
-    alignItems: 'flex-start',
-  },
-  
-  loadingBubble: {
-    padding: '0.75rem 1rem',
-    backgroundColor: '#ffffff',
-    border: 'none',
-    borderRadius: '0.75rem',
-    borderBottomLeftRadius: '0.25rem',
-    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-  },
-  
-  loadingDots: {
-    display: 'flex',
-    gap: '0.375rem',
-    alignItems: 'center',
-  },
-  
-  loadingDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    backgroundColor: '#9ca3af',
-    animation: 'pulse 1.4s ease-in-out infinite',
-  },
-  
-  // Input Area
-  inputWrapper: {
-    borderTop: '1px solid #e5e7eb',
-    backgroundColor: '#ffffff',
-    padding: '0.75rem 0.5rem 0.25rem 0.5rem',
-    position: 'sticky',
-    bottom: 0,
-    zIndex: 10,
-    marginBottom: 0,
-  },
-  
-  inputContainer: {
-    display: 'flex',
-    alignItems: 'flex-end',
-    gap: '0.5rem',
-    backgroundColor: '#f9fafb',
-    border: '1px solid #e5e7eb',
-    borderRadius: '1.25rem',
-    padding: '0.625rem 0.875rem',
-    transition: 'all 200ms ease-in-out',
-    marginBottom: 0,
-  },
-  
-  inputContainerFocused: {
-    borderColor: '#0284c7',
-    boxShadow: '0 0 0 3px rgba(2, 132, 199, 0.1)',
-  },
-  
-  textarea: {
-    flex: 1,
-    border: 'none',
-    outline: 'none',
-    backgroundColor: 'transparent',
-    fontSize: '0.9375rem',
-    fontFamily: 'inherit',
-    resize: 'none',
-    maxHeight: '120px',
-    overflowY: 'auto',
-    padding: '0',
-    lineHeight: 1.5,
-    color: '#111827',
-    minHeight: '24px',
-  },
-  
-  sendButton: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    backgroundColor: '#0284c7',
-    color: '#ffffff',
-    border: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    flexShrink: 0,
-    transition: 'all 200ms ease-in-out',
-    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.3)',
-    minWidth: '44px', // Touch-friendly
-    minHeight: '44px',
-  },
-  
-  sendButtonDisabled: {
-    backgroundColor: '#d1d5db',
-    cursor: 'not-allowed',
-    boxShadow: 'none',
-    opacity: 0.5,
-  },
-  
-  sendButtonSpinner: {
-    width: '20px',
-    height: '20px',
-    border: '2px solid rgba(255, 255, 255, 0.3)',
-    borderTopColor: '#ffffff',
-    borderRadius: '50%',
-    animation: 'spin 600ms linear infinite',
-  },
-};

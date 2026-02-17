@@ -445,7 +445,7 @@ const styles = {
   container: {
     height: '100vh',
     maxHeight: '100vh',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f8fafc',
     width: '100%',
     maxWidth: '100%',
     overflowX: 'hidden',
@@ -484,15 +484,14 @@ const styles = {
     maxWidth: '500px'
   },
   header: {
-    backgroundColor: '#ffffff',
-    borderBottom: '1px solid #e5e7eb',
+    borderBottom: '1px solid #e2e8f0',
     padding: '0.75rem 1rem',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
     position: 'sticky',
     top: 0,
     zIndex: 100,
-    backdropFilter: 'blur(10px)',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(12px)',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
   },
   headerContent: {
     maxWidth: '1400px',
@@ -547,8 +546,8 @@ const styles = {
     alignItems: 'center',
     gap: '0.375rem',
     padding: '0.25rem 0.75rem',
-    backgroundColor: '#e0f2fe',
-    color: '#0284c7',
+    backgroundColor: '#eff6ff',
+    color: '#2563eb',
     borderRadius: '9999px',
     fontSize: '0.875rem',
     fontWeight: 500,
@@ -562,7 +561,7 @@ const styles = {
   },
   backButton: {
     padding: '0.5rem 0.875rem',
-    backgroundColor: '#0284c7',
+    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
     color: '#ffffff',
     borderRadius: '0.5rem',
     textDecoration: 'none',
@@ -571,6 +570,7 @@ const styles = {
     transition: 'all 200ms ease-in-out',
     whiteSpace: 'nowrap',
     flexShrink: 0,
+    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
   },
   content: {
     maxWidth: '1400px',
